@@ -629,13 +629,26 @@ function getMedia(data, type){
  }).filter(x=>x.url||x.thumbnail);
 }
 async function requestJSON(path,payload,signal){
- const controller=signal?null:new AbortController();const activeSignal=signal||controller.signal;const timeout=setTimeout(()=>controller?.abort(),STELLAR_CONFIG.timeoutMs);
+ const controller=new AbortController();
+ let didTimeout=false;
+ const forwardAbort=()=>controller.abort();
+ if(signal){
+  if(signal.aborted)controller.abort();
+  else signal.addEventListener('abort',forwardAbort,{once:true});
+ }
+ const timeout=setTimeout(()=>{didTimeout=true;controller.abort();},STELLAR_CONFIG.timeoutMs);
  try{
-  const res=await fetch(STELLAR_CONFIG.apiBase+path,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload),signal:activeSignal});
+  const res=await fetch(STELLAR_CONFIG.apiBase+path,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
   const text=await res.text();let data;try{data=text?JSON.parse(text):{};}catch{data={text};}
   if(!res.ok){const msg=data?.error?.message||data?.error||data?.message||data?.text||('Request failed ('+res.status+')');throw new Error(typeof msg==='string'?msg:JSON.stringify(msg));}
   return data;
- }catch(err){if(didTimeout){throw new Error('The request timed out. Check your network or increase the Worker timeout if the provider is still processing.');}throw err;}finally{clearTimeout(timeout);if(signal)signal.removeEventListener('abort',forwardAbort);}
+ }catch(err){
+  if(didTimeout)throw new Error('The request timed out. Check your network or increase the Worker timeout if the provider is still processing.');
+  throw err;
+ }finally{
+  clearTimeout(timeout);
+  if(signal)signal.removeEventListener('abort',forwardAbort);
+ }
 }
 function routeIntent(text, hasImages){
  const t=text.toLowerCase();
