@@ -47,6 +47,22 @@
 .source-card b{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .source-card span{display:flex;align-items:center;gap:6px;color:#7f91af;font-size:10px}
 .source-card img{width:14px;height:14px;border-radius:3px}
+
+/* v3: tool chip, @ menu, thinking, memory */
+.composer-card{position:relative}
+.tool-chip{display:inline-flex;align-items:center;gap:7px;margin:0 0 8px;padding:5px 6px 5px 10px;border-radius:999px;background:rgba(99,102,241,.16);border:1px solid rgba(129,140,248,.35);color:#c7d2fe;font-size:12px}
+.tool-chip.hidden,.at-menu.hidden{display:none}
+.tool-chip button{border:0;background:rgba(148,163,184,.18);color:#e2e8f0;width:20px;height:20px;border-radius:50%;line-height:1;cursor:pointer;padding:0}
+.at-menu{position:absolute;left:8px;right:8px;bottom:calc(100% + 8px);background:#0d1630;border:1px solid rgba(133,153,194,.3);border-radius:14px;padding:6px;box-shadow:0 16px 40px rgba(0,0,0,.45);z-index:30}
+.at-menu button{width:100%;display:flex;align-items:center;gap:11px;border:0;background:transparent;color:#e2e8f0;padding:10px;border-radius:10px;text-align:left;font-size:13px;cursor:pointer}
+.at-menu button:hover,.at-menu button:active{background:rgba(99,102,241,.18)}
+.at-menu small{display:block;color:#8ba3c6;font-size:11px}
+.think-box{margin:0 0 10px;border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:rgba(148,163,184,.05);font-size:12px;color:#9fb0cc}
+.think-box summary{cursor:pointer;display:flex;align-items:center;gap:8px;list-style:none}
+.think-box div{padding:5px 0 0 4px;line-height:1.5}
+.mem-row{display:flex;gap:8px;margin:8px 0}.mem-row input{flex:1}
+.mem-row button{border:0;border-radius:10px;padding:0 13px;background:rgba(148,163,184,.14);color:#e2e8f0;cursor:pointer}
+.mem-row button.del:hover{background:rgba(251,113,133,.25)}
 </style>
 </head>
 <body>
@@ -76,7 +92,7 @@
         <button class="quick-card" data-prompt="Compare cloud hosting, shared hosting, and serverless hosting in a helpful comparison table."><i class="fa-solid fa-table-columns"></i><strong>Compare options</strong><span>Tables, trade-offs, and recommendations</span></button>
       </div>
     </div><div id="messageList" class="message-list hidden"></div></div></section>
-    <footer class="composer-dock"><div class="composer-wrap"><form id="chatForm" class="composer"><div class="composer-card"><div id="pendingFiles" class="pending-files hidden"></div><div class="composer-input-row"><textarea id="messageInput" rows="1" aria-label="Message STELLAR AI" placeholder="Message STELLAR AI…" maxlength="12000"></textarea><button class="send-button" id="sendButton" type="submit" title="Send message" aria-label="Send message"><i class="fa-solid fa-arrow-up"></i></button></div><div class="composer-tools"><button class="tool-button" type="button" id="attachBtn" title="Attach image or text file" aria-label="Attach file"><i class="fa-solid fa-paperclip"></i></button><button class="tool-button" type="button" id="cameraBtn" title="Live camera: capture a frame to analyse" aria-label="Camera"><i class="fa-solid fa-camera"></i></button><button class="tool-button" type="button" id="voiceBtn" title="Voice mode" aria-label="Voice mode"><i class="fa-solid fa-microphone"></i></button><button class="tool-button" type="button" id="diagramBtn" title="Ask for a diagram" aria-label="Show diagram"><i class="fa-solid fa-diagram-project"></i></button><span id="modeChip" class="mode-chip hidden">Web research</span><span class="tool-spacer"></span><button class="tool-button" type="button" id="mediaBtn" title="Find existing photos or videos" aria-label="Find media"><i class="fa-solid fa-photo-film"></i></button><button class="tool-button" type="button" id="imageBtn" title="Generate an image" aria-label="Generate image"><i class="fa-solid fa-wand-magic-sparkles"></i></button></div></div><div class="composer-hint">STELLAR AI can make mistakes. Check important information and review web sources.</div></form></div></footer>
+    <footer class="composer-dock"><div class="composer-wrap"><form id="chatForm" class="composer"><div class="composer-card"><div id="pendingFiles" class="pending-files hidden"></div><div id="atMenu" class="at-menu hidden"></div><div id="toolChip" class="tool-chip hidden"></div><div class="composer-input-row"><textarea id="messageInput" rows="1" aria-label="Message STELLAR AI" placeholder="Message STELLAR AI…" maxlength="12000"></textarea><button class="send-button" id="sendButton" type="submit" title="Send message" aria-label="Send message"><i class="fa-solid fa-arrow-up"></i></button></div><div class="composer-tools"><button class="tool-button" type="button" id="attachBtn" title="Attach image or text file" aria-label="Attach file"><i class="fa-solid fa-paperclip"></i></button><button class="tool-button" type="button" id="cameraBtn" title="Live camera: capture a frame to analyse" aria-label="Camera"><i class="fa-solid fa-camera"></i></button><button class="tool-button" type="button" id="voiceBtn" title="Voice mode" aria-label="Voice mode"><i class="fa-solid fa-microphone"></i></button><button class="tool-button" type="button" id="diagramBtn" title="Ask for a diagram" aria-label="Show diagram"><i class="fa-solid fa-diagram-project"></i></button><button class="tool-button" type="button" id="atBtn" title="Tools" aria-label="Tools" style="font-weight:700">@</button><span id="modeChip" class="mode-chip hidden">Web research</span><span class="tool-spacer"></span><button class="tool-button" type="button" id="mediaBtn" title="Find existing photos or videos" aria-label="Find media"><i class="fa-solid fa-photo-film"></i></button><button class="tool-button" type="button" id="imageBtn" title="Generate an image" aria-label="Generate image"><i class="fa-solid fa-wand-magic-sparkles"></i></button></div></div><div class="composer-hint">STELLAR AI can make mistakes. Check important information and review web sources.</div></form></div></footer>
   </main>
 </div>
 <div id="menuOverlay" class="menu-overlay"></div>
@@ -89,6 +105,7 @@
   <button class="menu-item" data-action="image-studio"><i class="fa-regular fa-image"></i> Image Studio</button>
   <button class="menu-item" data-action="web-research"><i class="fa-solid fa-globe"></i> Web Research</button>
   <button class="menu-item" data-action="files-uploads"><i class="fa-solid fa-folder-open"></i> Files &amp; Uploads</button>
+  <button class="menu-item" data-action="memory"><i class="fa-solid fa-brain"></i> Memory Bank</button>
   <hr class="menu-divider">
   <div class="menu-section">Tools</div>
   <button class="menu-item" data-action="voice-mode"><i class="fa-solid fa-microphone-lines"></i> Voice Mode</button>
@@ -107,7 +124,7 @@
 <div id="toastStack" class="toast-stack" aria-live="polite"></div>
 <script>
 /* --- App configuration: keep this URL aligned with your deployed Cloudflare Worker. --- */
-const STELLAR_CONFIG = { apiBase: 'https://stellarai.patrickchidiebered.workers.dev', timeoutMs: 60000, maxImageBytes: 5 * 1024 * 1024, maxTextBytes: 300000 };
+const STELLAR_CONFIG = { apiBase: 'https://stellar-ai-setup.patrickchidiebered.workers.dev', timeoutMs: 60000, maxImageBytes: 5 * 1024 * 1024, maxTextBytes: 300000 };
 </script>
 <script>
 // Main Animation Controller
@@ -517,7 +534,7 @@ function setStatus(ok, label){ els.statusDot.classList.toggle('online',!!ok); el
 async function apiHealth(){
   const controller = new AbortController(); const t=setTimeout(()=>controller.abort(),6500);
   try{ const r=await fetch(STELLAR_CONFIG.apiBase+'/health',{method:'GET',signal:controller.signal,headers:{'Accept':'application/json'}}); if(!r.ok) throw new Error('Health check returned '+r.status); let j={};try{j=await r.json();}catch{}
-    if(j&&j.service==='STELLAR AI Worker'){const miss=['groq','tavily','pixabay','workersAI'].filter(k=>!j[k]);setStatus(!miss.length,miss.length?'Missing: '+miss.join(', '):'Worker ready');}
+    if(j&&(j.service==='STELLAR AI Worker'||'tavily' in j)){const miss=['groq','tavily','pixabay','workersAI','ai'].filter(k=>k in j&&!j[k]);setStatus(!miss.length,miss.length?'Missing: '+miss.join(', '):'Worker ready');}
     else setStatus(false,'Old Worker code is live'); }
   catch(e){ setStatus(false,'Connection unverified'); }
   finally{clearTimeout(t);}
@@ -577,7 +594,8 @@ function renderMessages(){
      const bubble=document.createElement('div');bubble.className='user-bubble';bubble.textContent=m.text||'';content.appendChild(bubble);
      (m.images||[]).forEach(im=>{if(im.dataUrl){const img=document.createElement('img');img.className='attached-preview';img.src=im.dataUrl;img.alt=im.name||'Uploaded image';content.appendChild(img);}else if(im.name){const note=document.createElement('div');note.className='file-chip';note.textContent='Attachment: '+im.name+(im.omitted?' (not saved in browser history)':'');content.appendChild(note);}});
    }else{
-     const body=document.createElement('div');body.className='assistant-body';body.innerHTML=renderMarkdown(m.text||'');content.appendChild(body);
+     if(m.thought&&m.thought.steps){const tb=document.createElement('details');tb.className='think-box';tb.innerHTML='<summary><i class="fa-solid fa-brain"></i> Thought for '+(m.thought.secs||1)+'s</summary>'+m.thought.steps.map(x=>'<div>'+escapeHtml(x)+'</div>').join('');content.appendChild(tb);}
+      const body=document.createElement('div');body.className='assistant-body';body.innerHTML=renderMarkdown(m.text||'');content.appendChild(body);
      (m.images||[]).forEach(im=>{if(im.url){const a=document.createElement('a');a.href=im.url;a.target='_blank';a.rel='noopener noreferrer';const img=document.createElement('img');img.className='generated-image';img.src=im.url;img.alt=im.alt||'Generated image';a.appendChild(img);content.appendChild(a);const dl=document.createElement('a');dl.className='mini-action';dl.href=im.url;dl.download='stellar-image.png';dl.innerHTML='<i class="fa-solid fa-download"></i> Download';content.appendChild(dl);}else if(im.omitted){const n=document.createElement('div');n.className='file-chip';n.textContent='Image not kept in saved history';content.appendChild(n);}});
      if(m.media&&m.media.length){const grid=document.createElement('div');grid.className='media-grid';grid.innerHTML=m.media.map(mediaCardHTML).join('');content.appendChild(grid);}
      if(m.sources&&m.sources.length){const sources=document.createElement('div');sources.className='source-list';sources.innerHTML='<div class="source-list-title"><i class="fa-solid fa-link"></i> Sources &amp; references</div>'+m.sources.slice(0,10).map(sourceCard).join('');content.appendChild(sources);}
@@ -697,7 +715,7 @@ function systemInstructions(){
  const diagrams=prefs.autoDiagrams!==false?'When a visual would help explain a process, system, timeline, or relationships, include a valid fenced Mermaid diagram. For simple questions, do not add a diagram.':'Do not add diagrams unless explicitly requested.';
  return SYSTEM_GUIDANCE+` ${style} ${diagrams} Use Markdown tables for comparisons or structured data when they are genuinely clearer than prose. Keep Mermaid syntax simple and valid. Do not create fake source URLs.`;
 }
-function historyForAPI(){return messages.slice(-MAX_HISTORY).map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.text||''}));}
+function historyForAPI(){return [...memPair(),...messages.slice(memory.length?-14:-MAX_HISTORY).map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.text||''}))];}
 async function sendMessage(textOverride,opts={}){
  if(isSending){toast('A response is already in progress. Stop it before sending another message.');return;}
  const text=(textOverride!==undefined?textOverride:els.input.value).trim();
@@ -706,15 +724,16 @@ async function sendMessage(textOverride,opts={}){
  if(!text && !images.length && !textFiles.length){toast('Type a message or attach a file first.');return;}
  let finalText=text;
  if(textFiles.length)finalText+=(finalText?'\n\n':'')+'Attached text files:\n'+textFiles.map(f=>'--- '+f.name+' ---\n'+f.text).join('\n\n');
- const intent=opts.forceIntent||routeIntent(finalText,images.length>0);
+ const intent=opts.forceIntent||(activeTool&&!images.length?toolIntent():routeIntent(finalText,images.length>0));
  lastPrompt=text||'Please analyze the attached image or file.';
  const userMsg={role:'user',text:finalText,createdAt:new Date().toISOString(),images:images.map(im=>({name:im.name,dataUrl:im.dataUrl||im.data||null})),media:[]};
- appendMessage(userMsg);
+ if(text&&!opts.retry)learn(text);appendMessage(userMsg);
  if(textOverride===undefined){els.input.value='';autoResize();}pendingAttachments=[];renderPending();forceSearchNext=false;updateModeChip();
  if(intent.kind==='camera'){openCamera();return;}
  if(intent.kind==='image'){ await processImageGeneration(finalText,images);return; }
  if(intent.kind==='media'){ await processMediaSearch(finalText,intent.mediaType);return; }
- if(intent.kind==='search'){ await processChatRequest(finalText,'/api/search',{...opts,images,intent});return; }
+ if(intent.kind==='think'){ await thinkHarder(finalText);return; }
+  if(intent.kind==='search'){ await processChatRequest(finalText,'/api/search',{...opts,images,intent});return; }
  await processChatRequest(finalText,'/api/chat',{...opts,images,intent});
 }
 async function processChatRequest(text,path,opts={}){
@@ -826,7 +845,8 @@ function handleMenuAction(action){
   case 'chat-history':renderHistory();break;
   case 'search-conversations':renderHistory('',true);setTimeout(()=>$('#historySearch')?.focus(),100);break;
   case 'image-studio':renderImageStudio();break;
-  case 'web-research':forceSearchNext=true;updateModeChip();els.input.value='Research on the web: ';autoResize();els.input.focus();toast('Web research mode selected. Send your question in the normal chat.');break;
+  case 'web-research':setTool('search');els.input.focus();break;
+   case 'memory':renderMemory();break;
   case 'files-uploads':els.fileInput.click();break;
   case 'voice-mode':startVoice();break;
   case 'live-camera':openCamera();break;
@@ -836,6 +856,68 @@ function handleMenuAction(action){
   case 'privacy':renderPrivacy();break;
   case 'help':renderHelp();break;
  }
+}
+
+let activeTool=null, memory=readStorage('stellar_memory',[]);
+const TOOLS={search:{i:'fa-globe',l:'Web search',d:'Answer from live web results',p:"Ask anything. I'll search the web…"},image:{i:'fa-wand-magic-sparkles',l:'Create images',d:'Generate an image from your words',p:'Describe the image you want…'},media:{i:'fa-photo-film',l:'Find existing images',d:'Search real photos on Pixabay',p:'What photos should I find?'},think:{i:'fa-brain',l:'Think harder',d:'Plan, research, draft and check',p:'Ask something that needs deep thinking…'}};
+function setTool(k){activeTool=TOOLS[k]?k:null;const c=$('#toolChip');if(!activeTool){c.classList.add('hidden');c.innerHTML='';els.input.placeholder='Message STELLAR AI…';return;}const t=TOOLS[k];c.innerHTML='<i class="fa-solid '+t.i+'"></i> '+t.l+' <button type="button" aria-label="Remove '+t.l+'">&times;</button>';c.classList.remove('hidden');c.querySelector('button').onclick=()=>{setTool(null);els.input.focus();};els.input.placeholder=t.p;}
+function toolIntent(){return activeTool==='image'?{kind:'image',reason:'tool'}:activeTool==='media'?{kind:'media',mediaType:'all',reason:'tool'}:activeTool==='think'?{kind:'think',reason:'tool'}:{kind:'search',reason:'tool'};}
+function showAt(f){const m=$('#atMenu');f=(f||'').toLowerCase();const ks=Object.keys(TOOLS).filter(k=>!f||TOOLS[k].l.toLowerCase().split(' ').some(w=>w.startsWith(f)));if(!ks.length){m.classList.add('hidden');return;}m.innerHTML=ks.map(k=>'<button type="button" data-tool="'+k+'"><i class="fa-solid '+TOOLS[k].i+'"></i><span>'+TOOLS[k].l+'<small>'+TOOLS[k].d+'</small></span></button>').join('');m.classList.remove('hidden');m.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{els.input.value=els.input.value.replace(/(^|\s)@\w*$/,'$1');autoResize();setTool(b.dataset.tool);m.classList.add('hidden');els.input.focus();});}
+els.input.addEventListener('input',()=>{const m=/(^|\s)@(\w*)$/.exec(els.input.value);if(m)showAt(m[2]);else $('#atMenu').classList.add('hidden');});
+$('#atBtn').addEventListener('click',()=>{const m=$('#atMenu');if(m.classList.contains('hidden'))showAt('');else m.classList.add('hidden');});
+document.addEventListener('click',e=>{if(!e.target.closest('#atMenu,#atBtn'))$('#atMenu').classList.add('hidden');});
+
+async function thinkHarder(q){
+ isSending=true;setSendingUI(true);requestController=new AbortController();const sig=requestController.signal,t0=Date.now(),steps=[];
+ const box=document.createElement('details');box.className='think-box';box.id='thinkingRow';box.open=true;
+ const push=x=>{steps.push(x);box.innerHTML='<summary><span class="spinner"></span> Thinking…</summary>'+steps.map(v=>'<div>'+escapeHtml(v)+'</div>').join('');scrollToBottom();};
+ els.messageList.classList.remove('hidden');els.welcome.classList.add('hidden');els.messageList.appendChild(box);
+ const hist=historyForAPI().slice(0,-1),base=memory.length?2:0;
+ try{
+  push('The user asks me to look at: "'+q.slice(0,100)+(q.length>100?'…':'')+'". Working out what is really being asked.');
+  let plan={};
+  try{plan=JSON.parse(getText(await requestJSON('/api/chat',{message:'Reply with ONLY compact JSON, no other text: {"steps":"one sentence on how you will answer","search":true or false,"query":"short web search query if search is true"}. Set search to true only when a good answer depends on facts that may have changed since your training. Question: '+q,history:hist},sig)).match(/\{[\s\S]*\}/)[0]);}catch(e){if(e.name==='AbortError')throw e;}
+  if(plan.steps)push('My plan: '+String(plan.steps).slice(0,220));
+  let notes='',sources=[];
+  if(plan.search){const sq=String(plan.query||q).slice(0,150);push('I am now searching the web for "'+sq+'"…');const s=await requestJSON('/api/search',{message:sq,query:sq,history:[]},sig);sources=bindWorkerSources(s);notes=getText(s);push('I have searched the web and found '+sources.length+' source'+(sources.length===1?'':'s')+'.');}
+  push('Now I am drafting a careful answer and checking it for mistakes…');
+  const extra=notes?[{role:'user',content:'Research notes to rely on (do not invent links): '+notes.slice(0,6000)},{role:'assistant',content:'Understood.'}]:[];
+  const r=await requestJSON('/api/chat',{message:q+'\n\n(Write the best possible final answer. Draft it, check the draft for errors or gaps, fix them, and reply with only the final answer.)',history:[...hist.slice(0,base),...hist.slice(base).slice(-10),...extra]},sig);
+  const answer=getText(r)||'I could not produce an answer.',secs=Math.max(1,Math.round((Date.now()-t0)/1000));
+  removeThinking();
+  appendMessage({role:'assistant',text:answer,createdAt:new Date().toISOString(),sources,images:[],media:[],model:r.model||null,thought:{steps,secs}});
+  latestAssistantMessage=answer;if(prefs.voiceReplies||liveVoiceEnabled)speak(answer);
+ }catch(err){removeThinking();if(err.name==='AbortError')toast('Request stopped.');else{appendMessage({role:'assistant',text:"I couldn't complete that request.\n\n**Details:** "+(err.message||'Unexpected error.'),createdAt:new Date().toISOString(),sources:[],media:[]});toast('Request failed. See the error in chat.','error');}}
+ finally{requestController=null;isSending=false;setSendingUI(false);}
+}
+
+const memSave=()=>writeStorage('stellar_memory',memory);
+function memPair(){return memory.length?[{role:'user',content:'Facts to remember about me (use them naturally, do not list them unless I ask): '+memory.map(m=>m.text).join('; ')},{role:'assistant',content:'Understood. I will remember and use these.'}]:[];}
+const MEM_CUE=/\b(my name|call me|i am|i'm|i live|i work|i study|i like|i love|i prefer|i hate|my (favou?rite|birthday|school|job|age|hobby|hobbies|country|city)|remember|forget|remove|delete|change my|update my|from now on|stop calling)\b/i;
+async function learn(text){
+ if(!MEM_CUE.test(text)||text.length>400)return;
+ try{
+  const r=getText(await requestJSON('/api/chat',{message:'You maintain a short memory list about a user. Existing list as JSON: '+JSON.stringify(memory.map(m=>({id:m.id,text:m.text})))+'. The user just wrote: "'+text.replace(/"/g,"'")+'". Decide if this message states a lasting personal fact or preference worth remembering, corrects or changes an existing item, or asks to forget something. Reply with ONLY JSON like {"ops":[{"op":"add","text":"The user\'s name is David"},{"op":"update","id":"x","text":"The user\'s name is Sam"},{"op":"remove","id":"x"}]} and use an empty ops list when nothing applies. Never store passwords, keys, card numbers or ID numbers. Write each text as one short third-person sentence.',history:[]}));
+  const ops=JSON.parse(r.match(/\{[\s\S]*\}/)[0]).ops;if(!Array.isArray(ops)||!ops.length)return;
+  let ch=0;
+  for(const o of ops.slice(0,5)){
+   const t=String(o.text||'').trim().slice(0,200);
+   if(o.op==='add'&&t&&!memory.some(m=>m.text.toLowerCase()===t.toLowerCase())){memory.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),text:t});ch++;}
+   else if(o.op==='update'&&t){const m=memory.find(x=>x.id===o.id);if(m){m.text=t;ch++;}}
+   else if(o.op==='remove'){const n=memory.length;memory=memory.filter(x=>x.id!==o.id);if(memory.length<n)ch++;}
+  }
+  memory=memory.slice(-60);
+  if(ch){memSave();toast('Memory updated.','success');if(els.modalBackdrop.classList.contains('open')&&$('#memList'))renderMemory();}
+ }catch(e){}
+}
+function renderMemory(){
+ const rows=memory.length?memory.map(m=>'<div class="mem-row"><input class="field-input" data-mem-edit="'+m.id+'" value="'+escapeHtml(m.text)+'" maxlength="200"><button type="button" class="del" data-mem-del="'+m.id+'" aria-label="Remove">&times;</button></div>').join(''):'<p style="color:#8ba3c6;font-size:12px">Nothing yet. Tell Stellar things like "my name is David", or add a fact below.</p>';
+ openModal('Memory Bank','Everything Stellar remembers about you. Edit or remove anything.','<div id="memList">'+rows+'</div><div class="mem-row"><input class="field-input" id="memNew" placeholder="e.g. My name is David" maxlength="200"><button type="button" id="memAdd">Add</button></div>'+(memory.length?'<div class="mem-row"><button type="button" id="memClear" style="padding:9px 12px">Clear all memory</button></div>':''),'fa-brain');
+ $$('[data-mem-edit]').forEach(i=>i.onchange=()=>{const m=memory.find(x=>x.id===i.dataset.memEdit),v=i.value.trim();if(!m)return;if(!v){memory=memory.filter(x=>x!==m);memSave();renderMemory();return;}m.text=v.slice(0,200);memSave();toast('Memory saved.','success');});
+ $$('[data-mem-del]').forEach(b=>b.onclick=()=>{memory=memory.filter(x=>x.id!==b.dataset.memDel);memSave();renderMemory();});
+ const add=()=>{const v=($('#memNew').value||'').trim();if(!v)return;memory.push({id:'m'+Date.now().toString(36),text:v.slice(0,200)});memory=memory.slice(-60);memSave();renderMemory();};
+ $('#memAdd').onclick=add;$('#memNew').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();add();}};
+ const cl=$('#memClear');if(cl)cl.onclick=()=>{if(confirm('Clear everything Stellar remembers about you?')){memory=[];memSave();renderMemory();}};
 }
 $('#menuOpenBtn').addEventListener('click',openMenu);$('#menuCloseBtn').addEventListener('click',closeMenu);els.menuOverlay.addEventListener('click',closeMenu);$('#topNewChatBtn').addEventListener('click',()=>newChat());
 $$('[data-action]').forEach(b=>b.addEventListener('click',()=>handleMenuAction(b.dataset.action)));
