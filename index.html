@@ -581,6 +581,11 @@ const STELLAR_CONFIG = { apiBase: 'https://stellar-ai-setup.patrickchidiebered.w
 <script>
 (() => {
 'use strict';
+const PERSONAS={default:{l:'Balanced Stellar',d:'Clear, friendly and general-purpose',p:''},
+ architect:{l:'Architect Mode',d:'Systems, code and trade-offs',p:'Answer as a senior software and systems architect: structured and precise, explain trade-offs, use diagrams, and give complete working code when asked.'},
+ writer:{l:'Writer & Scholar',d:'Polished writing and research',p:'Answer as a thoughtful writer and scholar: clear prose, strong structure, careful reasoning, and a polished tone.'},
+ designer:{l:'UI/UX Designer',d:'Usability, layout and visual design',p:'Answer as a UI/UX designer: focus on usability, visual hierarchy and accessibility, and give concrete design and CSS suggestions.'},
+ analyst:{l:'Data Analyst',d:'Numbers, tables and assumptions',p:'Answer as a data analyst: be quantitative, show calculations and assumptions, prefer tables, and state uncertainty.'}};
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => Array.from(root.querySelectorAll(s));
 const els = {
@@ -794,22 +799,84 @@ async function requestJSON(path,payload,signal){
  finally{clearTimeout(timeout);if(signal)signal.removeEventListener('abort',forwardAbort);}
 }
 async function requestStreaming(path,payload,signal,onDelta){
- const controller=new AbortController();let didTimeout=false;const forwardAbort=()=>controller.abort();
+ const controller=new AbortController();
+ let didTimeout=false,reader=null;
+ const forwardAbort=()=>controller.abort();
  if(signal){if(signal.aborted)controller.abort();else signal.addEventListener('abort',forwardAbort,{once:true});}
- const timeout=setTimeout(()=>{didTimeout=true;controller.abort();},Math.max(STELLAR_CONFIG.timeoutMs,120000));
+ // Respect the configured frontend deadline for both headers and the complete response body.
+ const timeoutMs=Math.max(1000,Number(STELLAR_CONFIG.timeoutMs)||60000);
+ const timeout=setTimeout(()=>{didTimeout=true;controller.abort();},timeoutMs);
+ const parseBody=(raw)=>{try{return raw?JSON.parse(raw):{};}catch{return {text:raw};}};
+ const errorFrom=(data,status)=>{
+  const value=data?.error?.message||data?.error||data?.message||data?.text||('Request failed ('+status+')');
+  return new Error(typeof value==='string'?value:JSON.stringify(value));
+ };
  try{
-  const res=await fetch(STELLAR_CONFIG.apiBase+path,{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream, application/json'},body:JSON.stringify({...payload,stream:true}),signal:controller.signal});
-  if(!res.ok){const text=await res.text();let data={};try{data=JSON.parse(text);}catch{data={text};}const msg=data?.error?.message||data?.error||data?.message||data?.text||('Request failed ('+res.status+')');throw new Error(typeof msg==='string'?msg:JSON.stringify(msg));}
+  const res=await fetch(STELLAR_CONFIG.apiBase+path,{
+   method:'POST',
+   headers:{'Content-Type':'application/json','Accept':'text/event-stream, application/json'},
+   body:JSON.stringify({...payload,stream:true}),
+   signal:controller.signal
+  });
   const contentType=(res.headers.get('content-type')||'').toLowerCase();
-  if(!contentType.includes('text/event-stream')){const data=await res.json();const text=getText(data);if(text)onDelta(text);return {...data,reply:text};}
-  if(!res.body)throw new Error('Streaming is not supported by this response.');
-  const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='',reply='',meta={};
-  const handleEvent=raw=>{const lines=raw.split(/\r?\n/);for(const line of lines){if(!line.startsWith('data:'))continue;const value=line.slice(5).trim();if(!value)continue;let packet;try{packet=JSON.parse(value);}catch{continue;}if(packet.type==='meta'||packet.type==='done'){meta={...meta,...packet};}else if(packet.type==='delta'&&typeof packet.text==='string'){reply+=packet.text;onDelta(packet.text);}else if(packet.type==='error'){throw new Error(packet.error||'The model stream failed.');}}};
-  while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split(/\r?\n\r?\n/);buffer=events.pop()||'';for(const event of events)handleEvent(event);}
+  if(!res.ok){const raw=await res.text();throw errorFrom(parseBody(raw),res.status);}
+
+  // The deployed Worker normally returns JSON. Read it as text first so a malformed
+  // or empty response produces a useful message instead of an opaque JSON parse error.
+  if(!contentType.includes('text/event-stream')){
+   const raw=await res.text();
+   if(!raw.trim())return {};
+   let data;
+   try{data=JSON.parse(raw);}
+   catch{throw new Error('The Worker returned an unexpected non-JSON response: '+raw.slice(0,240));}
+   const text=getText(data);
+   if(text)onDelta(text);
+   return data;
+  }
+
+  if(!res.body)throw new Error('The server announced streaming but returned no response body.');
+  reader=res.body.getReader();
+  const decoder=new TextDecoder();
+  let buffer='',reply='',meta={};
+  const handleEvent=raw=>{
+   for(const line of raw.split(/\r?\n/)){
+    if(!line.startsWith('data:'))continue;
+    const value=line.slice(5).trim();
+    if(!value||value==='[DONE]')continue;
+    let packet;
+    try{packet=JSON.parse(value);}catch{continue;}
+    if(packet.type==='meta')meta={...meta,...packet};
+    else if(packet.type==='delta'&&typeof packet.text==='string'){
+     reply+=packet.text;onDelta(packet.text);
+    }else if(packet.type==='done'){
+     meta={...meta,...packet};
+     const finalText=typeof packet.reply==='string'?packet.reply:(typeof packet.text==='string'?packet.text:'');
+     if(!reply&&finalText){reply=finalText;onDelta(finalText);}
+    }else if(packet.type==='error'){
+     throw new Error(packet.error?.message||packet.error||'The model stream failed.');
+    }
+   }
+  };
+  while(true){
+   const {done,value}=await reader.read();
+   if(done)break;
+   buffer+=decoder.decode(value,{stream:true});
+   const events=buffer.split(/\r?\n\r?\n/);
+   buffer=events.pop()||'';
+   for(const event of events)handleEvent(event);
+  }
+  buffer+=decoder.decode();
   if(buffer.trim())handleEvent(buffer);
+  if(!reply&&typeof meta.reply==='string'&&meta.reply){reply=meta.reply;onDelta(reply);}
   return {...meta,reply};
- }catch(err){if(didTimeout)throw new Error('The streaming request timed out. Check your network or provider status.');throw err;}
- finally{clearTimeout(timeout);if(signal)signal.removeEventListener('abort',forwardAbort);}
+ }catch(err){
+  if(didTimeout)throw new Error('The request timed out after '+Math.round(timeoutMs/1000)+' seconds. Check your connection or try again.');
+  throw err;
+ }finally{
+  clearTimeout(timeout);
+  if(signal)signal.removeEventListener('abort',forwardAbort);
+  if(reader){try{reader.releaseLock();}catch{}}
+ }
 }
 function routeIntent(text, hasImages){
  const t=text.toLowerCase();
@@ -859,33 +926,91 @@ async function sendMessage(textOverride,opts={}){
  await processChatRequest(finalText,'/api/chat',{...opts,images,intent,userQuery:text,hasAttachments:textFiles.length>0});
 }
 async function processChatRequest(text,path,opts={}){
- isSending=true;setSendingUI(true);addThinking(path==='/api/search'?'Searching the web and checking sources…':'Thinking through your request…');
- requestController=new AbortController();const sig=requestController.signal;const hist=historyForAPI();
- const imageData=(opts.images||[]).filter(i=>i.dataUrl||i.data).map(i=>({name:i.name||'image',dataUrl:i.dataUrl||i.data,type:i.type||'image'}));
- const apiMessages=[{role:'system',content:systemInstructions()},...hist];
- const payload={message:text,prompt:text,input:text,userQuery:opts.userQuery||text,hasAttachments:!!opts.hasAttachments,query:path==='/api/search'?(opts.userQuery||text):undefined,history:hist.filter((m,i)=>i<hist.length-1),messages:apiMessages,system:systemInstructions(),systemPrompt:systemInstructions(),instructions:systemInstructions(),mode:path==='/api/search'?'search':'chat',task:path==='/api/search'?'web-research':'chat',search:path==='/api/search',webSearch:path==='/api/search',images:imageData,image:imageData[0]?.dataUrl,imageData:imageData[0]?.dataUrl};
+ // Enter the guarded lifecycle before touching the DOM or building the request.
+ // Any setup failure now reaches catch/finally and cannot leave the composer locked.
+ isSending=true;
+ const controller=new AbortController();
+ requestController=controller;
+ const sig=controller.signal;
  let assistantMsg=null,streamText='',partialRow=null;
  const onDelta=delta=>{
+  if(typeof delta!=='string'||!delta)return;
   streamText+=delta;
-  if(!assistantMsg){removeThinking();assistantMsg={role:'assistant',text:'',createdAt:new Date().toISOString(),sources:[],images:[],media:[],model:null,followUps:[]};messages.push(assistantMsg);renderMessages();partialRow=els.messageList.querySelector('.message-row.assistant:last-child');}
+  if(!assistantMsg){
+   removeThinking();
+   assistantMsg={role:'assistant',text:'',createdAt:new Date().toISOString(),sources:[],images:[],media:[],model:null,followUps:[]};
+   messages.push(assistantMsg);
+   renderMessages();
+   partialRow=els.messageList.querySelector('.message-row.assistant:last-child');
+  }
   assistantMsg.text=streamText;
-  const body=partialRow?.querySelector('.assistant-body');if(body){body.textContent=streamText;body.classList.add('stream-cursor');}
+  const body=partialRow?.querySelector('.assistant-body');
+  if(body){body.textContent=streamText;body.classList.add('stream-cursor');}
   scrollToBottom();
  };
  try{
+  setSendingUI(true);
+  addThinking(path==='/api/search'?'Searching the web and checking sources…':'Thinking through your request…');
+  const hist=historyForAPI();
+  const imageData=(opts.images||[]).filter(i=>i&&(i.dataUrl||i.data)).map(i=>({name:i.name||'image',dataUrl:i.dataUrl||i.data,type:i.type||'image'}));
+  const instructions=systemInstructions();
+  const apiMessages=[{role:'system',content:instructions},...hist];
+  const payload={
+   message:text,prompt:text,input:text,userQuery:opts.userQuery||text,
+   hasAttachments:!!opts.hasAttachments,
+   query:path==='/api/search'?(opts.userQuery||text):undefined,
+   history:hist.filter((m,i)=>i<hist.length-1),messages:apiMessages,
+   system:instructions,systemPrompt:instructions,instructions,
+   mode:path==='/api/search'?'search':'chat',
+   task:path==='/api/search'?'web-research':'chat',
+   search:path==='/api/search',webSearch:path==='/api/search',
+   images:imageData,image:imageData[0]?.dataUrl,imageData:imageData[0]?.dataUrl
+  };
   const data=await requestStreaming(path,payload,sig,onDelta);
-  removeThinking();const answer=getText(data)||streamText||'The service returned an empty response. Please try again.';
-  if(!assistantMsg){assistantMsg={role:'assistant',text:answer,createdAt:new Date().toISOString(),sources:[],images:[],media:[],model:null,followUps:[]};messages.push(assistantMsg);}
-  assistantMsg.text=answer;assistantMsg.sources=bindWorkerSources(data);assistantMsg.images=getImages(data);assistantMsg.media=[];assistantMsg.model=data.model||data.modelName||null;assistantMsg.followUps=suggestFollowups(text,answer,opts.intent?.kind|| (path==='/api/search'?'search':'chat'));
-  latestAssistantMessage=answer;persistConversation();renderMessages();
+  removeThinking();
+  const answer=getText(data)||streamText||'The service returned an empty response. Please try again.';
+  if(!assistantMsg){
+   assistantMsg={role:'assistant',text:answer,createdAt:new Date().toISOString(),sources:[],images:[],media:[],model:null,followUps:[]};
+   messages.push(assistantMsg);
+  }
+  assistantMsg.text=answer;
+  assistantMsg.sources=bindWorkerSources(data);
+  assistantMsg.images=getImages(data);
+  assistantMsg.media=[];
+  assistantMsg.model=data.model||data.modelName||null;
+  assistantMsg.followUps=suggestFollowups(text,answer,opts.intent?.kind||(path==='/api/search'?'search':'chat'));
+  latestAssistantMessage=answer;
+  persistConversation();
+  renderMessages();
   if(prefs.voiceReplies||liveVoiceEnabled)speak(answer);
-  if(path==='/api/search'&&!assistantMsg.sources.length&&!/https?:\/\//i.test(answer))toast('Search returned no structured source links. Check Tavily or the Worker version.');
+  if(path==='/api/search'&&!assistantMsg.sources.length&&!/https?:\/\//i.test(answer)){
+   toast('Search returned no structured source links. Check Tavily or the Worker version.');
+  }
  }catch(err){
   removeThinking();
-  if(assistantMsg&&streamText){assistantMsg.text=streamText;assistantMsg.stopped=err.name==='AbortError';assistantMsg.followUps=[];persistConversation();renderMessages();if(err.name==='AbortError')toast('Response stopped. The text received so far has been preserved.');else toast('Connection interrupted. The partial answer has been preserved.','error');}
-  else if(err.name==='AbortError'){toast('Request stopped before any answer text arrived.');}
-  else{let msg=err.message||'Unexpected request error.';appendMessage({role:'assistant',text:`I couldn't complete that request.\n\n**Details:** ${msg}\n\nCheck the Cloudflare Worker, model access, required secrets, and network connection. No API key is exposed by this page.`,createdAt:new Date().toISOString(),sources:[],media:[]});toast('Request failed. See the error in chat.','error');}
- }finally{removeThinking();requestController=null;isSending=false;setSendingUI(false);if(liveVoiceEnabled)setTimeout(()=>{if(liveVoiceEnabled&&!isSending&&!recognition&&!(window.speechSynthesis?.speaking))listenForVoiceTurn();},650);}
+  if(assistantMsg&&streamText){
+   assistantMsg.text=streamText;
+   assistantMsg.stopped=err.name==='AbortError';
+   assistantMsg.followUps=[];
+   try{persistConversation();renderMessages();}catch{}
+   if(err.name==='AbortError')toast('Response stopped. The text received so far has been preserved.');
+   else toast('Connection interrupted. The partial answer has been preserved.','error');
+  }else if(err.name==='AbortError'){
+   toast('Request stopped before any answer text arrived.');
+  }else{
+   const msg=err?.message||'Unexpected request error.';
+   appendMessage({role:'assistant',text:`I couldn't complete that request.\n\n**Details:** ${msg}\n\nCheck the Cloudflare Worker, model access, required secrets, and network connection. No API key is exposed by this page.`,createdAt:new Date().toISOString(),sources:[],media:[]});
+   toast('Request failed. See the error in chat.','error');
+  }
+ }finally{
+  removeThinking();
+  if(requestController===controller)requestController=null;
+  isSending=false;
+  try{setSendingUI(false);}catch{}
+  if(liveVoiceEnabled)setTimeout(()=>{
+   if(liveVoiceEnabled&&!isSending&&!recognition&&!(window.speechSynthesis?.speaking))listenForVoiceTurn();
+  },650);
+ }
 }
 function suggestFollowups(question,answer,kind){
  const q=String(question||'').trim(),a=String(answer||'').trim();if(a.length<220||/^(hi|hello|hey|thanks|thank you|ok|okay|good morning|good night|how are you)\b/i.test(q)||['image','media','camera'].includes(kind))return [];
@@ -903,17 +1028,34 @@ async function processImageGeneration(prompt,images=[]){await generateImage(prom
 async function generateImage(prompt,alreadyUserMessage=false,images=[]){
  if(isSending){toast('A response is already in progress. Stop it before starting image generation.');return;}
  if(!alreadyUserMessage)appendMessage({role:'user',text:'Generate an image: '+prompt,createdAt:new Date().toISOString(),images:[]});
- isSending=true;setSendingUI(true);addThinking(images.length?'Editing your reference image…':'Creating your image…');requestController=new AbortController();
+ isSending=true;
+ const controller=new AbortController();
+ requestController=controller;
  try{
-   const imagePrompt=String(prompt||'').trim()||(images.length?'Create a polished variation of the supplied image while preserving its main subject.':'');
-   const imageInputs=[];for(const im of (images||[]).filter(i=>i.dataUrl||i.data).slice(0,4)){imageInputs.push({name:im.name||'reference-image',dataUrl:await resizeImageForEditing(im.dataUrl||im.data),type:'image/jpeg'});}
-   const payload={prompt:imagePrompt,promptText:imagePrompt,message:imagePrompt,query:imagePrompt,images:imageInputs,attachments:imageInputs,image:imageInputs[0]?.dataUrl,systemPrompt:'Generate a high-quality original image from the prompt. When a reference image is supplied, edit or transform it according to the user request.'};
-   const data=await requestJSON('/api/generate-image',payload,requestController.signal);removeThinking();
-   const imgs=getImages(data);const text=getText(data)||(imgs.length?'Your generated image is ready.':'The image service did not return a recognizable image.');
-   appendMessage({role:'assistant',text,createdAt:new Date().toISOString(),images:imgs,sources:bindWorkerSources(data),media:[]});
-   if(!imgs.length)toast('No image was detected in the response. Check the deployed Worker image model and binding.','error');
- }catch(err){removeThinking();if(err.name==='AbortError'){toast('Image request stopped.');}else appendMessage({role:'assistant',text:`Image generation or editing failed: ${err.message||'Unknown error'}. Check the Workers AI binding named AI, model access, and remaining quota.`,createdAt:new Date().toISOString(),images:[],sources:[],media:[]});}
- finally{removeThinking();requestController=null;isSending=false;setSendingUI(false);}
+  setSendingUI(true);
+  addThinking(images.length?'Editing your reference image…':'Creating your image…');
+  const imagePrompt=String(prompt||'').trim()||(images.length?'Create a polished variation of the supplied image while preserving its main subject.':'');
+  const imageInputs=[];
+  for(const im of (images||[]).filter(i=>i&&(i.dataUrl||i.data)).slice(0,4)){
+   imageInputs.push({name:im.name||'reference-image',dataUrl:await resizeImageForEditing(im.dataUrl||im.data),type:'image/jpeg'});
+  }
+  const payload={prompt:imagePrompt,promptText:imagePrompt,message:imagePrompt,query:imagePrompt,images:imageInputs,attachments:imageInputs,image:imageInputs[0]?.dataUrl,systemPrompt:'Generate a high-quality original image from the prompt. When a reference image is supplied, edit or transform it according to the user request.'};
+  const data=await requestJSON('/api/generate-image',payload,controller.signal);
+  removeThinking();
+  const imgs=getImages(data);
+  const answer=getText(data)||(imgs.length?'Your generated image is ready.':'The image service did not return a recognizable image.');
+  appendMessage({role:'assistant',text:answer,createdAt:new Date().toISOString(),images:imgs,sources:bindWorkerSources(data),media:[]});
+  if(!imgs.length)toast('No image was detected in the response. Check the deployed Worker image model and binding.','error');
+ }catch(err){
+  removeThinking();
+  if(err.name==='AbortError')toast('Image request stopped.');
+  else appendMessage({role:'assistant',text:`Image generation or editing failed: ${err.message||'Unknown error'}. Check the Workers AI binding named AI, model access, and remaining quota.`,createdAt:new Date().toISOString(),images:[],sources:[],media:[]});
+ }finally{
+  removeThinking();
+  if(requestController===controller)requestController=null;
+  isSending=false;
+  try{setSendingUI(false);}catch{}
+ }
 }
 function resizeImageForEditing(dataUrl){
  return new Promise(resolve=>{if(!dataUrl||!/^data:image\//i.test(dataUrl))return resolve(dataUrl);const img=new Image();img.onload=()=>{try{const max=500,scale=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.86));}catch{resolve(dataUrl);}};img.onerror=()=>resolve(dataUrl);img.src=dataUrl;});
@@ -924,22 +1066,52 @@ async function processMediaSearch(query,type='images'){
 async function searchMedia(query,type='all',alreadyUserMessage=false){
  if(isSending){toast('A response is already in progress. Stop it before starting a media search.');return;}
  if(!alreadyUserMessage)appendMessage({role:'user',text:'Find existing '+(type==='videos'?'videos':type==='images'?'images':'photos and videos')+': '+query,createdAt:new Date().toISOString(),images:[]});
- isSending=true;setSendingUI(true);addThinking('Searching Pixabay for existing media…');requestController=new AbortController();
+ isSending=true;
+ const controller=new AbortController();
+ requestController=controller;
  try{
+  setSendingUI(true);
+  addThinking('Searching Pixabay for existing media…');
   let data,results=[],sources=[];
   const requestedTypes=type==='all'?['images','videos']:[type];
-  const outcomes=await Promise.allSettled(requestedTypes.map(async mediaType=>{const singular=mediaType==='videos'?'video':'image';return requestJSON('/api/media',{query,prompt:query,term:query,type:singular,mediaType,kind:mediaType,format:mediaType},requestController.signal).then(payload=>({payload,media:getMedia(payload,mediaType)}));}));
-  removeThinking();const failures=[];for(const outcome of outcomes){if(outcome.status==='fulfilled'){const entry=outcome.value;data=entry.payload;results=results.concat(entry.media);sources=sources.concat(bindWorkerSources(entry.payload));}else failures.push(outcome.reason);}
+  const outcomes=await Promise.allSettled(requestedTypes.map(async mediaType=>{
+   const singular=mediaType==='videos'?'video':'image';
+   const payload=await requestJSON('/api/media',{query,prompt:query,term:query,type:singular,mediaType,kind:mediaType,format:mediaType},controller.signal);
+   return {payload,media:getMedia(payload,mediaType)};
+  }));
+  removeThinking();
+  const failures=[];
+  for(const outcome of outcomes){
+   if(outcome.status==='fulfilled'){
+    const entry=outcome.value;data=entry.payload;
+    results=results.concat(entry.media);
+    sources=sources.concat(bindWorkerSources(entry.payload));
+   }else failures.push(outcome.reason);
+  }
   if(!results.length&&failures.length)throw failures[0];
-  const txt=results.length?`Found ${results.length} existing Pixabay result${results.length===1?'':'s'}. These are stock media, not AI-generated images.${failures.length?' One requested media category could not be loaded.':''}`:(getText(data)||'No media results were returned. Try another search phrase or check the Pixabay API key and Worker route.');
-  appendMessage({role:'assistant',text:txt,createdAt:new Date().toISOString(),media:results,sources:sources,images:[]});
+  const answer=results.length
+   ?`Found ${results.length} existing Pixabay result${results.length===1?'':'s'}. These are stock media, not AI-generated images.${failures.length?' One requested media category could not be loaded.':''}`
+   :(getText(data)||'No media results were returned. Try another search phrase or check the Pixabay API key and Worker route.');
+  appendMessage({role:'assistant',text:answer,createdAt:new Date().toISOString(),media:results,sources,images:[]});
   if(!results.length)toast('No media results detected. Check the Worker media response format or search query.');
- }catch(err){removeThinking();if(err.name==='AbortError'){toast('Media search stopped.');}else{appendMessage({role:'assistant',text:`Media search failed: ${err.message||'Unknown error'}.\n\nCheck the Pixabay API secret, rate limits, and /api/media route.`,createdAt:new Date().toISOString(),media:[],sources:[],images:[]});toast('Media search failed.','error');}}
- finally{requestController=null;isSending=false;setSendingUI(false);if(liveVoiceEnabled)setTimeout(()=>{if(liveVoiceEnabled&&!isSending&&!recognition)listenForVoiceTurn();},650);}
+ }catch(err){
+  removeThinking();
+  if(err.name==='AbortError')toast('Media search stopped.');
+  else{
+   appendMessage({role:'assistant',text:`Media search failed: ${err.message||'Unknown error'}.\n\nCheck the Pixabay API secret, rate limits, and /api/media route.`,createdAt:new Date().toISOString(),media:[],sources:[],images:[]});
+   toast('Media search failed.','error');
+  }
+ }finally{
+  removeThinking();
+  if(requestController===controller)requestController=null;
+  isSending=false;
+  try{setSendingUI(false);}catch{}
+  if(liveVoiceEnabled)setTimeout(()=>{if(liveVoiceEnabled&&!isSending&&!recognition)listenForVoiceTurn();},650);
+ }
 }
 function addThinking(label){const n=document.createElement('div');n.className='thinking-row';n.id='thinkingRow';n.innerHTML='<span class="spinner"></span><span>'+escapeHtml(label)+'</span>';els.messageList.classList.remove('hidden');els.welcome.classList.add('hidden');els.messageList.appendChild(n);scrollToBottom();}
 function removeThinking(){$('#thinkingRow')?.remove();}
-function setSendingUI(sending){els.send.disabled=false;els.send.classList.toggle('stop',sending);els.send.innerHTML=sending?'<i class="fa-solid fa-stop"></i>':'<i class="fa-solid fa-arrow-up"></i>';els.send.title=sending?'Stop current request':'Send message';els.send.setAttribute('aria-label',sending?'Stop current request':'Send message');if(sending)els.send.onclick=(e)=>{e.preventDefault();requestController?.abort();};else els.send.onclick=null;}
+function setSendingUI(sending){if(!els.send)return;els.send.disabled=false;els.send.classList.toggle('stop',!!sending);els.send.innerHTML=sending?'<i class="fa-solid fa-stop"></i>':'<i class="fa-solid fa-arrow-up"></i>';els.send.title=sending?'Stop current request':'Send message';els.send.setAttribute('aria-label',sending?'Stop current request':'Send message');if(sending)els.send.onclick=(e)=>{e.preventDefault();requestController?.abort();};else els.send.onclick=null;}
 function sendSpecial(text){if(isSending){toast('Please stop the current request first.');return;}sendMessage(text);}
 function scrollToReplyStart(){requestAnimationFrame(()=>{const rows=els.messageList.querySelectorAll('.message-row.assistant');const row=rows[rows.length-1];if(!row)return;const top=row.getBoundingClientRect().top-els.chatScroll.getBoundingClientRect().top+els.chatScroll.scrollTop-12;els.chatScroll.scrollTo({top:Math.max(0,top),behavior:'smooth'});});}
  function scrollToBottom(){requestAnimationFrame(()=>{els.chatScroll.scrollTop=els.chatScroll.scrollHeight;});}
@@ -1062,29 +1234,66 @@ els.input.addEventListener('input',()=>{const m=/(^|\s)@(\w*)$/.exec(els.input.v
 $('#atBtn').addEventListener('click',()=>{const m=$('#atMenu');if(m.classList.contains('hidden'))showAt('');else m.classList.add('hidden');});
 document.addEventListener('click',e=>{if(!e.target.closest('#atMenu,#atBtn'))$('#atMenu').classList.add('hidden');});
 async function thinkHarder(q){
- isSending=true;setSendingUI(true);requestController=new AbortController();const sig=requestController.signal,t0=Date.now(),steps=[];
- const box=document.createElement('details');box.className='think-box';box.id='thinkingRow';box.open=true;
- const push=x=>{steps.push(x);box.innerHTML='<summary><span class="spinner"></span> Thinking…</summary>'+steps.map(v=>'<div>'+escapeHtml(v)+'</div>').join('');scrollToBottom();};
- els.messageList.classList.remove('hidden');els.welcome.classList.add('hidden');els.messageList.appendChild(box);
- const hist=historyForAPI().slice(0,-1),base=memActive()?2:0;
+ if(isSending){toast('A response is already in progress. Stop it before starting a deeper analysis.');return;}
+ isSending=true;
+ const controller=new AbortController();
+ requestController=controller;
+ const sig=controller.signal,t0=Date.now(),steps=[];
+ const box=document.createElement('details');
+ box.className='think-box';box.id='thinkingRow';box.open=true;
+ const push=x=>{
+  steps.push(x);
+  box.innerHTML='<summary><span class="spinner"></span> Thinking…</summary>'+steps.map(v=>'<div>'+escapeHtml(v)+'</div>').join('');
+  scrollToBottom();
+ };
  try{
+  setSendingUI(true);
+  els.messageList.classList.remove('hidden');
+  els.welcome.classList.add('hidden');
+  els.messageList.appendChild(box);
+  const hist=historyForAPI(),base=memActive()?2:0;
   push('The user asks me to look at: "'+q.slice(0,100)+(q.length>100?'…':'')+'". Working out what is really being asked.');
   let plan={};
-  try{plan=JSON.parse(getText(await requestJSON('/api/chat',{message:'Reply with ONLY compact JSON, no other text: {"steps":"one sentence on how you will answer","search":true or false,"query":"short web search query if search is true"}. Set search to true only when a good answer depends on facts that may have changed since your training. Question: '+q,history:hist},sig)).match(/\{[\s\S]*\}/)[0]);}catch(e){if(e.name==='AbortError')throw e;}
+  try{
+   const planResponse=await requestJSON('/api/chat',{message:'Reply with ONLY compact JSON, no other text: {"steps":"one sentence on how you will answer","search":true or false,"query":"short web search query if search is true"}. Set search to true only when a good answer depends on facts that may have changed since your training. Question: '+q,history:hist.slice(0,-1)},sig);
+   const match=getText(planResponse).match(/\{[\s\S]*\}/);
+   if(match)plan=JSON.parse(match[0]);
+  }catch(err){if(err.name==='AbortError')throw err;}
   if(plan.steps)push('My plan: '+String(plan.steps).slice(0,220));
   let notes='',sources=[];
-  if(plan.search){const sq=String(plan.query||q).slice(0,150);push('I am now searching the web for "'+sq+'"…');const s=await requestJSON('/api/search',{message:sq,query:sq,history:[]},sig);sources=bindWorkerSources(s);notes=getText(s);push('I have searched the web and found '+sources.length+' source'+(sources.length===1?'':'s')+'.');}
+  if(plan.search){
+   const searchQuery=String(plan.query||q).slice(0,150);
+   push('I am now searching the web for "'+searchQuery+'"…');
+   const searchResult=await requestJSON('/api/search',{message:searchQuery,query:searchQuery,history:[]},sig);
+   sources=bindWorkerSources(searchResult);notes=getText(searchResult);
+   push('I have searched the web and found '+sources.length+' source'+(sources.length===1?'':'s')+'.');
+  }
   push('Now I am drafting a careful answer and checking it for mistakes…');
   const extra=notes?[{role:'user',content:'Research notes to rely on (do not invent links): '+notes.slice(0,6000)},{role:'assistant',content:'Understood.'}]:[];
-  const r=await requestJSON('/api/chat',{message:q+'\n\n(Write the best possible final answer. Draft it, check the draft for errors or gaps, fix them, and reply with only the final answer.)',history:[...hist.slice(0,base),...hist.slice(base).slice(-10),...extra]},sig);
-  const answer=getText(r)||'I could not produce an answer.',secs=Math.max(1,Math.round((Date.now()-t0)/1000));
+  const finalResult=await requestJSON('/api/chat',{
+   message:q+'\n\n(Write the best possible final answer. Draft it, check the draft for errors or gaps, fix them, and reply with only the final answer.)',
+   history:[...hist.slice(0,base),...hist.slice(base).slice(-10),...extra]
+  },sig);
+  const answer=getText(finalResult)||'I could not produce an answer.';
+  const secs=Math.max(1,Math.round((Date.now()-t0)/1000));
   removeThinking();
-  appendMessage({role:'assistant',text:answer,createdAt:new Date().toISOString(),sources,images:[],media:[],model:r.model||null,thought:{steps,secs}});
-  latestAssistantMessage=answer;if(prefs.voiceReplies||liveVoiceEnabled)speak(answer);
- }catch(err){removeThinking();if(err.name==='AbortError')toast('Request stopped.');else{appendMessage({role:'assistant',text:"I couldn't complete that request.\n\n**Details:** "+(err.message||'Unexpected error.'),createdAt:new Date().toISOString(),sources:[],media:[]});toast('Request failed. See the error in chat.','error');}}
- finally{requestController=null;isSending=false;setSendingUI(false);}
+  appendMessage({role:'assistant',text:answer,createdAt:new Date().toISOString(),sources,images:[],media:[],model:finalResult.model||null,thought:{steps,secs}});
+  latestAssistantMessage=answer;
+  if(prefs.voiceReplies||liveVoiceEnabled)speak(answer);
+ }catch(err){
+  removeThinking();
+  if(err.name==='AbortError')toast('Deeper analysis stopped.');
+  else{
+   appendMessage({role:'assistant',text:"I couldn't complete the deeper analysis.\n\n**Details:** "+(err.message||'Unexpected error.'),createdAt:new Date().toISOString(),sources:[],media:[]});
+   toast('Request failed. See the error in chat.','error');
+  }
+ }finally{
+  removeThinking();
+  if(requestController===controller)requestController=null;
+  isSending=false;
+  try{setSendingUI(false);}catch{}
+ }
 }
-
 let currentCanvasProject=null,canvasBusy=false,liveModeActive=false,liveStatusTimer=null;
 function applyCanvasPreview(files){
  let html=String(files['index.html']||'');
@@ -1260,11 +1469,6 @@ async function ocrImage(att){
  }catch(e){}
 }
 
-const PERSONAS={default:{l:'Balanced Stellar',d:'Clear, friendly and general-purpose',p:''},
- architect:{l:'Architect Mode',d:'Systems, code and trade-offs',p:'Answer as a senior software and systems architect: structured and precise, explain trade-offs, use diagrams, and give complete working code when asked.'},
- writer:{l:'Writer & Scholar',d:'Polished writing and research',p:'Answer as a thoughtful writer and scholar: clear prose, strong structure, careful reasoning, and a polished tone.'},
- designer:{l:'UI/UX Designer',d:'Usability, layout and visual design',p:'Answer as a UI/UX designer: focus on usability, visual hierarchy and accessibility, and give concrete design and CSS suggestions.'},
- analyst:{l:'Data Analyst',d:'Numbers, tables and assumptions',p:'Answer as a data analyst: be quantitative, show calculations and assumptions, prefer tables, and state uncertainty.'}};
 function personaText(){const p=PERSONAS[prefs.persona];return p&&p.p?p.p:'';}
 function memActive(){return memory.length>0||!!personaText();}
 function renderPersonas(){
