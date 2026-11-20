@@ -639,6 +639,15 @@ let latestAssistantMessage = null;
 let forceSearchNext = false;
 let liveVoiceEnabled = false;
 let recognition = null;
+let liveSessionId = 0;
+let liveRestartTimer = null;
+let liveModeActive = false;
+let speechRunId = 0;
+let activeTtsController = null;
+let activeTtsAudio = null;
+let activeTtsObjectUrl = null;
+let activeTtsCancel = null;
+let voicePlaybackBusy = false;
 let lastPrompt = '';
 const MAX_HISTORY = 22;
 
@@ -684,13 +693,15 @@ function openModal(title, subtitle, body, icon='fa-sparkles'){
   const first=els.modal.querySelector('input,textarea,select,button'); if(first) setTimeout(()=>{if(els.modalBackdrop.classList.contains('open')&&first.isConnected)first.focus({preventScroll:true});},50);
 }
 function closeModal(){
+  // Live Mode is microphone-active only while its dialog is open.
+  if(liveModeActive) stopLiveMode();
   if(document.fullscreenElement && els.modal.contains(document.fullscreenElement)){try{document.exitFullscreen();}catch{}}
   els.modalBackdrop.classList.remove('open'); els.modal.classList.remove('canvas-modal'); els.modalBackdrop.setAttribute('aria-hidden','true');
 }
 function renderSettings(){
   const voices = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : [];
   const voiceOptions = '<option value="">System default voice</option>' + voices.map(v=>'<option value="'+escapeHtml(v.name)+'">'+escapeHtml(v.name+' ('+v.lang+')')+'</option>').join('');
-  openModal('Settings & Personalization','Preferences are stored locally on this device.','<div class="setting-row"><div><strong>Answer style</strong><small>Choose how much detail STELLAR AI usually provides.</small></div><select id="prefAnswerStyle"><option value="concise">Concise</option><option value="balanced">Balanced</option><option value="detailed">Detailed</option></select></div><div class="setting-row"><div><strong>Appearance</strong><small>Switch between dark and light themes.</small></div><select id="prefTheme"><option value="dark">Dark</option><option value="light">Light</option></select></div><div class="setting-row"><div><strong>Font size</strong><small>Adjust reading size across chat and menus.</small><div style="font-size:11px;color:var(--muted);margin-top:5px"><span id="fontSizeValue">14</span> px</div></div><input id="prefFontSize" type="range" min="12" max="18" step="1" value="14" aria-label="Font size" style="max-width:140px;width:40%"></div><div class="setting-row"><div><strong>Automatic diagrams</strong><small>Suggest diagrams when they genuinely help explain a topic.</small></div><input class="toggle" id="prefDiagrams" type="checkbox"></div><div class="setting-row"><div><strong>Read answers aloud</strong><small>Use your browser speech service for spoken responses.</small></div><input class="toggle" id="prefVoiceReplies" type="checkbox"></div><div class="setting-row"><div><strong>Speech voice</strong><small>Available voices depend on your device and browser.</small></div><select id="prefVoiceName" aria-label="Speech voice" style="max-width:190px"><option value="">System default voice</option></select></div><div class="setting-row"><div><strong>Speech speed</strong><small>Adjust read-aloud and spoken replies.</small><div style="font-size:11px;color:var(--muted);margin-top:5px"><span id="voiceRateValue">1.0</span>×</div></div><input id="prefVoiceRate" type="range" min="0.75" max="1.5" step="0.05" value="1" aria-label="Speech speed" style="max-width:140px;width:40%"></div><div class="setting-row"><div><strong>Animations</strong><small>Turn off decorative UI motion if preferred.</small></div><input class="toggle" id="prefAnimations" type="checkbox"></div><p style="font-size:10px;line-height:1.6;color:var(--muted);margin:13px 0 0">Preferences are not cloud-synced. Provider access and quota depend on your configured services.</p><div class="modal-actions"><button class="primary-button" id="savePrefs"><i class="fa-solid fa-check"></i> Save preferences</button></div>','fa-sliders');
+  openModal('Settings & Personalization','Preferences are stored locally on this device.','<div class="setting-row"><div><strong>Answer style</strong><small>Choose how much detail STELLAR AI usually provides.</small></div><select id="prefAnswerStyle"><option value="concise">Concise</option><option value="balanced">Balanced</option><option value="detailed">Detailed</option></select></div><div class="setting-row"><div><strong>Appearance</strong><small>Switch between dark and light themes.</small></div><select id="prefTheme"><option value="dark">Dark</option><option value="light">Light</option></select></div><div class="setting-row"><div><strong>Font size</strong><small>Adjust reading size across chat and menus.</small><div style="font-size:11px;color:var(--muted);margin-top:5px"><span id="fontSizeValue">14</span> px</div></div><input id="prefFontSize" type="range" min="12" max="18" step="1" value="14" aria-label="Font size" style="max-width:140px;width:40%"></div><div class="setting-row"><div><strong>Automatic diagrams</strong><small>Suggest diagrams when they genuinely help explain a topic.</small></div><input class="toggle" id="prefDiagrams" type="checkbox"></div><div class="setting-row"><div><strong>Read answers aloud</strong><small>Use Cloudflare voice for spoken responses. Your device voice is the fallback.</small></div><input class="toggle" id="prefVoiceReplies" type="checkbox"></div><div class="setting-row"><div><strong>Fallback speech voice</strong><small>Used only if Cloudflare voice is unavailable. Cloudflare uses its configured Luna voice.</small></div><select id="prefVoiceName" aria-label="Speech voice" style="max-width:190px"><option value="">System default voice</option></select></div><div class="setting-row"><div><strong>Speech speed</strong><small>Adjust Cloudflare playback and the device-voice fallback.</small><div style="font-size:11px;color:var(--muted);margin-top:5px"><span id="voiceRateValue">1.0</span>×</div></div><input id="prefVoiceRate" type="range" min="0.75" max="1.5" step="0.05" value="1" aria-label="Speech speed" style="max-width:140px;width:40%"></div><div class="setting-row"><div><strong>Animations</strong><small>Turn off decorative UI motion if preferred.</small></div><input class="toggle" id="prefAnimations" type="checkbox"></div><p style="font-size:10px;line-height:1.6;color:var(--muted);margin:13px 0 0">Preferences are not cloud-synced. Provider access and quota depend on your configured services.</p><div class="modal-actions"><button class="primary-button" id="savePrefs"><i class="fa-solid fa-check"></i> Save preferences</button></div>','fa-sliders');
   $('#prefAnswerStyle').value=prefs.answerStyle||'balanced'; $('#prefTheme').value=prefs.theme==='light'?'light':'dark'; $('#prefFontSize').value=Math.min(18,Math.max(12,Number(prefs.fontSize)||14)); $('#fontSizeValue').textContent=$('#prefFontSize').value;
   $('#prefDiagrams').checked=prefs.autoDiagrams!==false; $('#prefVoiceReplies').checked=!!prefs.voiceReplies; $('#prefVoiceRate').value=Math.min(1.5,Math.max(.75,Number(prefs.voiceRate)||1)); $('#voiceRateValue').textContent=Number($('#prefVoiceRate').value).toFixed(2); $('#prefAnimations').checked=prefs.animations!==false;
   const populateVoices=()=>{const sel=$('#prefVoiceName');if(!sel)return;const selected=prefs.voiceName||'';sel.innerHTML='<option value="">System default voice</option>'+speechSynthesis.getVoices().map(v=>'<option value="'+escapeHtml(v.name)+'">'+escapeHtml(v.name+' ('+v.lang+')')+'</option>').join('');sel.value=selected;};
@@ -946,7 +957,7 @@ async function processChatRequest(text,path,opts={}){
   if(assistantMsg&&streamText){assistantMsg.text=streamText;assistantMsg.stopped=err.name==='AbortError';assistantMsg.followUps=[];persistConversation();renderMessages();if(err.name==='AbortError')toast('Response stopped. The text received so far has been preserved.');else toast('Connection interrupted. The partial answer has been preserved.','error');}
   else if(err.name==='AbortError'){toast('Request stopped before any answer text arrived.');}
   else{let msg=err.message||'Unexpected request error.';appendMessage({role:'assistant',text:`I couldn't complete that request.\n\n**Details:** ${msg}\n\nCheck the Cloudflare Worker, model access, required secrets, and network connection. No API key is exposed by this page.`,createdAt:new Date().toISOString(),sources:[],media:[]});toast('Request failed. See the error in chat.','error');}
- }finally{removeThinking();requestController=null;isSending=false;try{setSendingUI(false);}catch{}if(liveVoiceEnabled)setTimeout(()=>{if(liveVoiceEnabled&&!isSending&&!recognition&&!(window.speechSynthesis?.speaking))listenForVoiceTurn();},650);}
+ }finally{removeThinking();requestController=null;isSending=false;try{setSendingUI(false);}catch{}scheduleLiveListening(650);}
 }
 function suggestFollowups(question,answer,kind){
  const q=String(question||'').trim(),a=String(answer||'').trim();if(a.length<220||/^(hi|hello|hey|thanks|thank you|ok|okay|good morning|good night|how are you)\b/i.test(q)||['image','media','camera'].includes(kind))return [];
@@ -974,7 +985,7 @@ async function generateImage(prompt,alreadyUserMessage=false,images=[]){
    appendMessage({role:'assistant',text,createdAt:new Date().toISOString(),images:imgs,sources:bindWorkerSources(data),media:[]});
    if(!imgs.length)toast('No image was detected in the response. Check the deployed Worker image model and binding.','error');
  }catch(err){removeThinking();if(err.name==='AbortError'){toast('Image request stopped.');}else appendMessage({role:'assistant',text:`Image generation or editing failed: ${err.message||'Unknown error'}. Check the Workers AI binding named AI, model access, and remaining quota.`,createdAt:new Date().toISOString(),images:[],sources:[],media:[]});}
- finally{removeThinking();requestController=null;isSending=false;setSendingUI(false);}
+ finally{removeThinking();requestController=null;isSending=false;setSendingUI(false);scheduleLiveListening(650);}
 }
 function resizeImageForEditing(dataUrl){
  return new Promise(resolve=>{if(!dataUrl||!/^data:image\//i.test(dataUrl))return resolve(dataUrl);const img=new Image();img.onload=()=>{try{const max=500,scale=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.86));}catch{resolve(dataUrl);}};img.onerror=()=>resolve(dataUrl);img.src=dataUrl;});
@@ -996,7 +1007,7 @@ async function searchMedia(query,type='all',alreadyUserMessage=false){
   appendMessage({role:'assistant',text:txt,createdAt:new Date().toISOString(),media:results,sources:sources,images:[]});
   if(!results.length)toast('No media results detected. Check the Worker media response format or search query.');
  }catch(err){removeThinking();if(err.name==='AbortError'){toast('Media search stopped.');}else{appendMessage({role:'assistant',text:`Media search failed: ${err.message||'Unknown error'}.\n\nCheck the Pixabay API secret, rate limits, and /api/media route.`,createdAt:new Date().toISOString(),media:[],sources:[],images:[]});toast('Media search failed.','error');}}
- finally{requestController=null;isSending=false;setSendingUI(false);if(liveVoiceEnabled)setTimeout(()=>{if(liveVoiceEnabled&&!isSending&&!recognition)listenForVoiceTurn();},650);}
+ finally{requestController=null;isSending=false;setSendingUI(false);scheduleLiveListening(650);}
 }
 function addThinking(label){const n=document.createElement('div');n.className='thinking-row';n.id='thinkingRow';n.innerHTML='<span class="spinner"></span><span>'+escapeHtml(label)+'</span>';els.messageList.classList.remove('hidden');els.welcome.classList.add('hidden');els.messageList.appendChild(n);scrollToBottom();}
 function removeThinking(){$('#thinkingRow')?.remove();}
@@ -1007,34 +1018,228 @@ function scrollToReplyStart(){requestAnimationFrame(()=>{const rows=els.messageL
 function copyText(text){if(!text){toast('Nothing to copy.');return;}if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text).then(()=>toast('Copied to clipboard.','success')).catch(()=>fallbackCopy(text));}else fallbackCopy(text);}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();try{document.execCommand('copy');toast('Copied to clipboard.','success');}catch{toast('Copy failed. Select the text manually.','error');}t.remove();}
 function downloadFile(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-function speak(text){
- if(!('speechSynthesis'in window)){toast('Read-aloud is not supported by this browser.','error');return;}
- speechSynthesis.cancel();const clean=speakable(safeText(text));if(!clean)return;
- const sent=clean.match(/[^.!?]+[.!?]*\s*/g)||[clean],parts=[];let cur='';
- for(const c of sent){if(cur&&(cur+c).length>200){parts.push(cur);cur=c;}else cur+=c;}if(cur)parts.push(cur);
- const selected=(speechSynthesis.getVoices()||[]).find(v=>v.name===prefs.voiceName),rate=Math.min(1.5,Math.max(.75,Number(prefs.voiceRate)||1));
- parts.forEach((p,k)=>{const u=new SpeechSynthesisUtterance(p.trim());u.rate=rate;u.pitch=1;u.lang=navigator.language||'en-US';if(selected)u.voice=selected;
-  if(k===0)u.onstart=()=>showStopSpeak(true);
-  if(k===parts.length-1){u.onend=()=>{showStopSpeak(false);if(liveVoiceEnabled&&!isSending)setTimeout(()=>{if(liveVoiceEnabled&&!isSending&&!recognition)listenForVoiceTurn();},250);};u.onerror=()=>showStopSpeak(false);}
-  speechSynthesis.speak(u);});
- }
-function startVoice(){
- if(liveVoiceEnabled){liveVoiceEnabled=false;if(recognition){try{recognition.stop();}catch{} }els.voiceBtn.classList.remove('active');els.voiceBtn.title='Voice mode';toast('Voice mode paused.');return;}
- const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR){toast('Voice input is not supported in this browser. Try a browser with speech recognition support.','error');return;}
- liveVoiceEnabled=true;els.voiceBtn.classList.add('active');els.voiceBtn.title='Voice mode is on — tap to stop';toast('Voice mode on. Speak, pause to send, then listen to the reply. Tap the microphone to stop.');listenForVoiceTurn();
+function isVoicePlaybackBusy(){
+ return voicePlaybackBusy || ('speechSynthesis' in window && (speechSynthesis.speaking || speechSynthesis.pending));
 }
-function listenForVoiceTurn(){
- if(!liveVoiceEnabled||isSending)return;
- if('speechSynthesis' in window && speechSynthesis.speaking){setTimeout(()=>{if(liveVoiceEnabled&&!isSending)listenForVoiceTurn();},800);return;}
- const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){liveVoiceEnabled=false;els.voiceBtn.classList.remove('active');toast('Speech recognition is unavailable.','error');return;}
+function splitSpeechChunks(text,maxLength=1800){
+ const source=String(text||'').trim();if(!source)return[];
+ const sentences=source.match(/[^.!?]+[.!?]*\s*/g)||[source],chunks=[];let current='';
+ for(const sentence of sentences){
+  let remaining=sentence;
+  while(remaining.length>maxLength){
+   let cut=remaining.lastIndexOf(' ',maxLength);if(cut<1)cut=maxLength;
+   const piece=remaining.slice(0,cut).trim();if(piece)chunks.push(piece);
+   remaining=remaining.slice(cut).trimStart();
+  }
+  if(current&&(current+remaining).length>maxLength){chunks.push(current.trim());current='';}
+  current+=remaining;
+ }
+ if(current.trim())chunks.push(current.trim());
+ return chunks;
+}
+function releaseTtsAudio(audio,url){
+ if(audio){
+  try{audio.onended=null;audio.onerror=null;audio.onplaying=null;audio.pause();audio.removeAttribute('src');audio.load();}catch{}
+  if(activeTtsAudio===audio)activeTtsAudio=null;
+ }
+ if(url){try{URL.revokeObjectURL(url);}catch{}if(activeTtsObjectUrl===url)activeTtsObjectUrl=null;}
+}
+function cancelCloudflareVoice(){
+ const controller=activeTtsController;activeTtsController=null;
+ if(controller){try{controller.abort();}catch{}}
+ const cancel=activeTtsCancel;activeTtsCancel=null;
+ if(cancel){try{cancel();}catch{}}
+ else if(activeTtsAudio||activeTtsObjectUrl)releaseTtsAudio(activeTtsAudio,activeTtsObjectUrl);
+ voicePlaybackBusy=false;
+}
+async function requestCloudflareTTS(text,runId){
+ const controller=new AbortController();activeTtsController=controller;
+ const timeout=setTimeout(()=>controller.abort(),25000);
  try{
-   recognition=new SR();recognition.lang=navigator.language||'en-US';recognition.interimResults=true;recognition.continuous=false;let finalText='';
-   recognition.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)finalText+=e.results[i][0].transcript;else interim+=e.results[i][0].transcript;}els.input.value=(finalText||interim).trim();autoResize();const liveText=$('#liveTranscript');if(liveText)liveText.textContent=(finalText||interim).trim()||'Listening…';};
-   recognition.onerror=e=>{if(liveVoiceEnabled&&e.error!=='no-speech')toast('Voice input issue: '+(e.error||'unknown error'),'error');};
-   recognition.onend=()=>{const spoken=finalText.trim();recognition=null;if(spoken){const liveText=$('#liveTranscript');if(liveText)liveText.textContent='You said: '+spoken;els.input.value='';autoResize();sendMessage(spoken);}else if(liveVoiceEnabled){setTimeout(()=>{if(liveVoiceEnabled&&!isSending)listenForVoiceTurn();},600);} };
-   recognition.start();
- }catch(e){recognition=null;liveVoiceEnabled=false;els.voiceBtn.classList.remove('active');toast('Could not start microphone. Check browser permission.','error');}
+  const response=await fetch(STELLAR_CONFIG.apiBase+'/api/tts',{
+   method:'POST',
+   headers:{'Content-Type':'application/json','Accept':'audio/mpeg, application/json'},
+   body:JSON.stringify({text,voice:'luna',format:'mp3'}),
+   signal:controller.signal
+  });
+  if(runId!==speechRunId)throw new DOMException('Speech request was superseded.','AbortError');
+  const contentType=(response.headers.get('content-type')||'').toLowerCase();
+  if(!response.ok){
+   let detail='Cloudflare voice returned HTTP '+response.status;
+   try{const data=await response.json();if(data&&data.error)detail=String(data.error);}catch{}
+   throw new Error(detail);
+  }
+  if(contentType.includes('application/json')){
+   let data={};try{data=await response.json();}catch{}
+   throw new Error(data.error||'The voice service returned an error instead of audio.');
+  }
+  if(contentType&&!contentType.startsWith('audio/')&&!contentType.includes('application/octet-stream'))
+   throw new Error('The voice service did not return an audio response ('+contentType+').');
+  const blob=await response.blob();
+  if(!blob||!blob.size)throw new Error('Cloudflare voice returned an empty audio file.');
+  return blob;
+ }finally{
+  clearTimeout(timeout);
+  if(activeTtsController===controller)activeTtsController=null;
+ }
+}
+function playTtsBlob(blob,runId,rate){
+ return new Promise((resolve,reject)=>{
+  if(runId!==speechRunId){resolve();return;}
+  if(typeof Audio==='undefined'){reject(new Error('Audio playback is unavailable in this browser.'));return;}
+  const url=URL.createObjectURL(blob),audio=new Audio(url);let settled=false;
+  activeTtsAudio=audio;activeTtsObjectUrl=url;
+  audio.preload='auto';audio.playbackRate=rate;
+  try{audio.preservesPitch=true;}catch{}
+  const finish=(error)=>{
+   if(settled)return;settled=true;
+   if(activeTtsCancel===cancel)activeTtsCancel=null;
+   releaseTtsAudio(audio,url);
+   if(error)reject(error);else resolve();
+  };
+  const cancel=()=>finish(new DOMException('Speech playback was stopped.','AbortError'));
+  activeTtsCancel=cancel;
+  audio.onplaying=()=>{
+   if(runId!==speechRunId)return;
+   showStopSpeak(true);
+   if(liveVoiceEnabled)setLiveStatus('STELLAR is speaking…','Cloudflare voice is playing. You can interrupt at any time.');
+  };
+  audio.onended=()=>finish();
+  audio.onerror=()=>finish(new Error('The browser could not play the Cloudflare audio response.'));
+  try{Promise.resolve(audio.play()).catch(error=>finish(error||new Error('Audio playback could not start.')));}
+  catch(error){finish(error);}
+ });
+}
+function finishSpeechRun(runId){
+ if(runId!==speechRunId)return;
+ voicePlaybackBusy=false;showStopSpeak(false);
+ if(liveVoiceEnabled&&liveModeActive){setLiveStatus('Ready for your next message','Reply finished. Speak when you are ready.');scheduleLiveListening(350);}
+}
+function playDeviceSpeech(parts,runId,startIndex=0){
+ if(runId!==speechRunId)return;
+ if(!('speechSynthesis'in window)||typeof SpeechSynthesisUtterance==='undefined'){
+  voicePlaybackBusy=false;showStopSpeak(false);
+  toast('Neither Cloudflare audio nor device speech playback is available in this browser.','error');
+  if(liveVoiceEnabled&&liveModeActive){setLiveStatus('Voice playback unavailable','You can still type, or check your connection and try speaking again.');scheduleLiveListening(450);}
+  return;
+ }
+ try{speechSynthesis.cancel();}catch{}
+ const selected=(speechSynthesis.getVoices()||[]).find(v=>v.name===prefs.voiceName);
+ const rate=Math.min(1.5,Math.max(.75,Number(prefs.voiceRate)||1));
+ const next=(index)=>{
+  if(runId!==speechRunId)return;
+  if(index>=parts.length){finishSpeechRun(runId);return;}
+  const utterance=new SpeechSynthesisUtterance(parts[index]);
+  utterance.rate=rate;utterance.pitch=1;utterance.lang=navigator.language||'en-US';
+  if(selected)utterance.voice=selected;
+  utterance.onstart=()=>{
+   if(runId!==speechRunId)return;
+   showStopSpeak(true);
+   if(index===startIndex&&liveVoiceEnabled)setLiveStatus('STELLAR is speaking…','Using your device voice because Cloudflare voice could not be played.');
+  };
+  utterance.onend=()=>{if(runId===speechRunId)next(index+1);};
+  utterance.onerror=()=>{
+   if(runId!==speechRunId)return;
+   toast('Device speech playback also failed.','error');finishSpeechRun(runId);
+  };
+  try{speechSynthesis.speak(utterance);}catch(error){toast('Device speech playback failed: '+(error.message||'unknown error'),'error');finishSpeechRun(runId);}
+ };
+ next(startIndex);
+}
+async function playCloudflareSpeech(parts,runId){
+ const rate=Math.min(1.5,Math.max(.75,Number(prefs.voiceRate)||1));
+ for(let index=0;index<parts.length;index++){
+  if(runId!==speechRunId)return;
+  try{
+   if(liveVoiceEnabled&&index===0)setLiveStatus('Preparing Cloudflare voice…','Generating the spoken reply.');
+   const blob=await requestCloudflareTTS(parts[index],runId);
+   if(runId!==speechRunId)return;
+   await playTtsBlob(blob,runId,rate);
+  }catch(error){
+   if(runId!==speechRunId)return;
+   console.warn('STELLAR Cloudflare TTS unavailable; switching to device speech.',error);
+   toast('Cloudflare voice could not be used. Switching to your device voice for this reply.','error');
+   playDeviceSpeech(parts,runId,index);
+   return;
+  }
+ }
+ finishSpeechRun(runId);
+}
+function speak(text){
+ const clean=speakable(safeText(text));if(!clean){scheduleLiveListening(250);return;}
+ // Do not let the microphone transcribe STELLAR's own spoken response.
+ if(liveVoiceEnabled&&recognition)retireLiveRecognition(true);
+ speechRunId++;
+ const thisRun=speechRunId;
+ cancelCloudflareVoice();
+ try{if('speechSynthesis'in window)speechSynthesis.cancel();}catch{}
+ const parts=splitSpeechChunks(clean,1800);
+ if(!parts.length){finishSpeechRun(thisRun);return;}
+ voicePlaybackBusy=true;showStopSpeak(true);
+ if(liveVoiceEnabled)setLiveStatus('Preparing voice reply…','Connecting to Cloudflare voice.');
+ playCloudflareSpeech(parts,thisRun);
+}
+function startVoice(){renderLiveMode();}
+function listenForVoiceTurn(session=liveSessionId){
+ if(!liveVoiceEnabled||!liveModeActive||session!==liveSessionId||isSending||recognition)return;
+ if(isVoicePlaybackBusy()){scheduleLiveListening(450);return;}
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;els.voiceBtn.classList.remove('active');toast('Speech recognition is unavailable in this browser.','error');setLiveStatus('Voice input unavailable','Try a browser that supports speech recognition.');return;}
+ if(!window.isSecureContext){liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;els.voiceBtn.classList.remove('active');toast('Live Mode requires a secure HTTPS page.','error');setLiveStatus('Secure connection required','Open STELLAR from its hosted HTTPS address.');return;}
+ let instance;
+ try{
+  instance=new SR();recognition=instance;
+  instance.lang=navigator.language||'en-US';instance.interimResults=true;instance.continuous=false;instance.maxAlternatives=1;
+  let finalText='',interimText='',ended=false;
+  setLiveStatus('Starting microphone…','Waiting for your speech.');
+  instance.onstart=()=>{if(recognition!==instance||session!==liveSessionId)return;setLiveStatus('Listening…','Speak naturally, then pause to send your message.');};
+  instance.onresult=e=>{
+   if(recognition!==instance||session!==liveSessionId)return;
+   let interim='';
+   for(let i=e.resultIndex;i<e.results.length;i++){
+    const result=e.results[i],spoken=result?.[0]?.transcript||'';
+    if(result.isFinal){finalText+=(finalText?' ':'')+spoken.trim();interim='';}
+    else interim+=(interim?' ':'')+spoken.trim();
+   }
+   if(interim)interimText=interim;
+   else if(finalText)interimText='';
+   const heard=[finalText,interimText].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+   if(heard){els.input.value=heard;autoResize();setLiveStatus('I heard you…','You: '+heard);}
+  };
+  instance.onerror=e=>{
+   if(recognition!==instance||session!==liveSessionId)return;
+   const reason=e?.error||'unknown';
+   if(reason==='aborted')return; // Expected when the user interrupts or exits Live Mode.
+   if(reason==='not-allowed'||reason==='service-not-allowed'||reason==='audio-capture'){
+    liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;clearTimeout(liveRestartTimer);liveRestartTimer=null;
+    els.voiceBtn.classList.remove('active');
+    const message=reason==='audio-capture'?'No microphone was detected.': 'Microphone permission was blocked. Allow microphone access for this HTTPS site.';
+    setLiveStatus('Microphone unavailable',message);toast(message,'error');
+   }else if(reason!=='no-speech'){
+    setLiveStatus('Voice input interrupted','The microphone reported: '+reason+'. Trying again.');
+   }
+  };
+  instance.onend=()=>{
+   if(ended)return;ended=true;
+   if(recognition!==instance||session!==liveSessionId)return;
+   recognition=null;
+   if(!liveVoiceEnabled||!liveModeActive)return;
+   const spoken=[finalText,interimText].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+   if(spoken){
+    els.input.value='';autoResize();
+    setLiveStatus('Sending your message…','You said: '+spoken);
+    // sendMessage routes voice turns through the same chat, search, image and Think paths as typed messages.
+    sendMessage(spoken,{fromLive:true});
+   }else{
+    setLiveStatus('Listening again…','No complete speech was captured. Speak when you are ready.');
+    scheduleLiveListening(450);
+   }
+  };
+  instance.start();
+ }catch(error){
+  if(recognition===instance)recognition=null;
+  if(session===liveSessionId){liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;els.voiceBtn.classList.remove('active');setLiveStatus('Could not start microphone','Check browser microphone permission and try again.');toast('Could not start the microphone. Check browser permission.','error');}
+ }
 }
 const attachmentLibraries={};
 function loadBrowserLibrary(key,src,globalName){
@@ -1153,11 +1358,11 @@ async function thinkHarder(q,findExisting=false,images=[]){
   removeThinking();appendMessage({role:'assistant',text:answer,createdAt:new Date().toISOString(),sources:bindWorkerSources(r),images:[],media:[],model:r.model||'@cf/google/gemma-4-26b-a4b-it',thought:{steps:[findExisting?'Used Gemma 4 with live Tavily research.':'Used Gemma 4 through Cloudflare Workers AI.','Reviewed the response for completeness and consistency.'],secs}});
   latestAssistantMessage=answer;if(prefs.voiceReplies||liveVoiceEnabled)speak(answer);
  }catch(err){removeThinking();if(err.name==='AbortError')toast('Request stopped.');else{appendMessage({role:'assistant',text:"I couldn't complete that Think Harder request.\n\n**Details:** "+(err.message||'Unexpected error.'),createdAt:new Date().toISOString(),sources:[],media:[]});toast('Think Harder failed. See the error in chat.','error');}}
- finally{requestController=null;isSending=false;setSendingUI(false);}
+ finally{requestController=null;isSending=false;setSendingUI(false);scheduleLiveListening(650);}
 }
 
 
-let currentCanvasProject=null,canvasBusy=false,canvasPreparing=false,canvasStageTimer=null,liveModeActive=false,liveStatusTimer=null;
+let currentCanvasProject=null,canvasBusy=false,canvasPreparing=false,canvasStageTimer=null,liveStatusTimer=null;
 const CANVAS_DB_NAME='stellar-canvas-library-v1',CANVAS_STORE='projects',CANVAS_VERSION_LIMIT=5;
 let canvasDbPromise=null,canvasLibraryCache=[],canvasLibraryLoaded=false,canvasController=null,canvasPauseRequested=false,canvasCancelRequested=false;
 function canvasDb(){
@@ -1406,13 +1611,65 @@ function applyCanvasPreview(files){
  return html;
 }
 function renderLiveMode(){
- openModal('Live Mode','Hands-free voice conversation uses browser speech services and your existing chat backend.','<div id="liveStatus" class="live-status"><span id="liveDot" class="live-dot"></span><strong id="liveStatusLabel">Not listening</strong><div id="liveTranscript" style="margin-top:8px;color:var(--muted)">Tap Start listening, speak naturally, and pause when you finish.</div></div><div class="canvas-controls"><button type="button" class="primary-button" id="liveStart"><i class="fa-solid fa-microphone"></i> Start listening</button><button type="button" class="secondary-button" id="liveInterrupt"><i class="fa-solid fa-hand"></i> Interrupt / stop speaking</button><button type="button" class="secondary-button" id="liveStop"><i class="fa-solid fa-stop"></i> End Live Mode</button></div><p style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:12px">Live Mode is dependent on browser speech recognition and speech synthesis. Use Interrupt / stop speaking if you want to cut off a spoken reply and start a new turn. No continuous video or background recording is used.</p>','fa-microphone-lines');
- $('#liveStart').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('This browser does not support speech recognition. Try a compatible browser and allow microphone access.','error');return;}liveVoiceEnabled=true;liveModeActive=true;$('#liveDot').classList.add('active');$('#liveStatusLabel').textContent='Listening for your voice';$('#liveTranscript').textContent='Live Mode is on. Speak, then pause to send your turn.';els.voiceBtn.classList.add('active');listenForVoiceTurn();};
- $('#liveInterrupt').onclick=()=>{if('speechSynthesis'in window)speechSynthesis.cancel();if(recognition){try{recognition.abort();}catch{}recognition=null;}if(liveVoiceEnabled){if(isSending&&requestController)requestController.abort();$('#liveStatusLabel').textContent='Stopping and returning to listening…';const resume=()=>{if(!liveVoiceEnabled)return;if(!isSending&&!recognition){$('#liveStatusLabel')&&($('#liveStatusLabel').textContent='Listening for your voice');listenForVoiceTurn();}else setTimeout(resume,350);};setTimeout(resume,250);}toast('Spoken reply interrupted.');};
- $('#liveStop').onclick=()=>{stopLiveMode();closeModal();};
+ openModal('Live Mode','Speak naturally. STELLAR sends your completed turn to the chat backend and reads the reply aloud.','<div id="liveStatus" class="live-status"><span id="liveDot" class="live-dot"></span><strong id="liveStatusLabel">'+(liveVoiceEnabled?'Live Mode is active':'Not listening')+'</strong><div id="liveTranscript" style="margin-top:8px;color:var(--muted)">'+(liveVoiceEnabled?'Live Mode is active. Continue speaking after each reply.':'Tap Start listening, speak naturally, and pause when you finish.')+'</div></div><div class="canvas-controls"><button type="button" class="primary-button" id="liveStart"><i class="fa-solid fa-microphone"></i> '+(liveVoiceEnabled?'Resume listening':'Start listening')+'</button><button type="button" class="secondary-button" id="liveInterrupt"><i class="fa-solid fa-hand"></i> Interrupt / stop speaking</button><button type="button" class="secondary-button" id="liveStop"><i class="fa-solid fa-stop"></i> End Live Mode</button></div><p style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:12px">Live Mode uses your browser for microphone recognition and Cloudflare’s Luna voice for spoken replies. If Cloudflare audio is unavailable, STELLAR falls back to your selected device voice. Keep this dialog open while using the microphone. Closing it ends Live Mode. Microphone access requires a secure HTTPS page and browser permission.</p>','fa-microphone-lines');
+ const startButton=$('#liveStart');
+ const interruptButton=$('#liveInterrupt');
+ const stopButton=$('#liveStop');
+ if(liveVoiceEnabled){$('#liveDot')?.classList.add('active');}
+ startButton.onclick=()=>{
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!window.isSecureContext){toast('Live Mode requires the hosted HTTPS version of STELLAR AI.','error');return;}
+  if(!SR){toast('This browser does not support speech recognition. Try a compatible browser and allow microphone access.','error');return;}
+  if(!liveVoiceEnabled){liveVoiceEnabled=true;liveModeActive=true;liveSessionId++;}
+  else liveModeActive=true;
+  els.voiceBtn.classList.add('active');
+  els.voiceBtn.title='Live Mode is active';
+  setLiveStatus('Starting microphone…','Speak naturally, then pause to send your turn.');
+  scheduleLiveListening(100);
+ };
+ interruptButton.onclick=()=>{
+  stopSpeaking();
+  if(recognition)retireLiveRecognition(true);
+  if(isSending&&requestController){requestController.abort();setLiveStatus('Interrupting response…','The current response is being stopped.');}
+  else setLiveStatus('Listening will resume','Speak when you are ready.');
+  scheduleLiveListening(450);
+  toast('Speech interrupted.');
+ };
+ stopButton.onclick=()=>{stopLiveMode();closeModal();};
+ if(liveVoiceEnabled&&!recognition&&!isSending&&!isVoicePlaybackBusy())scheduleLiveListening(150);
 }
-function stopLiveMode(){liveVoiceEnabled=false;liveModeActive=false;if(recognition){try{recognition.abort();}catch{}recognition=null;}if('speechSynthesis'in window)speechSynthesis.cancel();els.voiceBtn.classList.remove('active');if(requestController&&isSending)requestController.abort();const dot=$('#liveDot');dot?.classList.remove('active');const label=$('#liveStatusLabel');if(label)label.textContent='Live Mode ended';clearTimeout(liveStatusTimer);}
-
+function setLiveStatus(label, detail){
+ const labelEl=$('#liveStatusLabel');if(labelEl)labelEl.textContent=label;
+ const detailEl=$('#liveTranscript');if(detailEl&&detail!==undefined)detailEl.textContent=detail;
+ const dot=$('#liveDot');if(dot)dot.classList.toggle('active',!!liveVoiceEnabled);
+}
+function retireLiveRecognition(abort=true){
+ const current=recognition;recognition=null;
+ if(!current)return;
+ // Detach callbacks before aborting so an intentional stop cannot start another session.
+ current.onstart=null;current.onresult=null;current.onerror=null;current.onend=null;
+ try{if(abort)current.abort();else current.stop();}catch{}
+}
+function scheduleLiveListening(delay=550){
+ if(!liveVoiceEnabled||!liveModeActive)return;
+ clearTimeout(liveRestartTimer);
+ const session=liveSessionId;
+ liveRestartTimer=setTimeout(()=>{
+  liveRestartTimer=null;
+  if(!liveVoiceEnabled||!liveModeActive||session!==liveSessionId||isSending||recognition)return;
+  if(isVoicePlaybackBusy()){scheduleLiveListening(450);return;}
+  listenForVoiceTurn(session);
+ },Math.max(100,Number(delay)||0));
+}
+function stopLiveMode(){
+ liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;
+ clearTimeout(liveRestartTimer);liveRestartTimer=null;
+ retireLiveRecognition(true);
+ stopSpeaking();
+ els.voiceBtn.classList.remove('active');els.voiceBtn.title='Dictate message';
+ if(requestController&&isSending)requestController.abort();
+ setLiveStatus('Live Mode ended','The microphone has been stopped.');
+}
 const memSave=()=>writeStorage('stellar_memory',memory);
 function memPair(){if(!memActive())return[];const bits=[];if(personaText())bits.push('Role to play in every answer: '+personaText());if(memory.length)bits.push('Facts to remember about me (use them naturally, do not list them unless I ask): '+memory.map(m=>m.text).join('; '));return[{role:'user',content:bits.join('\n')},{role:'assistant',content:'Understood. I will follow this.'}];}
 const MEM_CUE=/\b(my name|call me|i am|i'm|i live|i work|i study|i like|i love|i prefer|i hate|my (favou?rite|birthday|school|job|age|hobby|hobbies|country|city)|remember|forget|remove|delete|change my|update my|from now on|stop calling)\b/i;
@@ -1490,9 +1747,9 @@ function speakable(t){
  return s.slice(0,6000);
 }
 function showStopSpeak(on){const b=$('#stopSpeakBtn');if(b)b.classList.toggle('hidden',!on);}
-function stopSpeaking(){try{speechSynthesis.cancel();}catch{}showStopSpeak(false);}
+function stopSpeaking(){speechRunId++;cancelCloudflareVoice();try{if('speechSynthesis'in window)speechSynthesis.cancel();}catch{}showStopSpeak(false);scheduleLiveListening(300);}
 $('#stopSpeakBtn').addEventListener('click',stopSpeaking);
-setInterval(()=>{if('speechSynthesis'in window&&!speechSynthesis.speaking&&!speechSynthesis.pending)showStopSpeak(false);},600);
+setInterval(()=>{if(!voicePlaybackBusy&&(!('speechSynthesis'in window)||(!speechSynthesis.speaking&&!speechSynthesis.pending)))showStopSpeak(false);},600);
 
 let dictWant=false,dictRec=null;
 function dictSession(){
@@ -1507,6 +1764,7 @@ function dictSession(){
 }
 function dictUI(on){els.voiceBtn.classList.toggle('recording',on);els.voiceBtn.title=on?'Listening… tap to stop':'Dictate message';els.voiceBtn.setAttribute('aria-pressed',String(!!on));}
 function toggleDictation(){
+ if(liveModeActive){stopLiveMode();closeModal();return;}
  if(dictWant){dictWant=false;try{dictRec&&dictRec.stop();}catch{}dictUI(false);return;}
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){toast('Speech-to-text is not supported in this browser. Try Chrome.','error');return;}
