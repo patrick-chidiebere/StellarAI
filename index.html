@@ -1324,21 +1324,25 @@ function listenForVoiceTurn(session=liveSessionId){
  let instance;
  try{
   instance=new SR();recognition=instance;
-  instance.lang=navigator.language||'en-US';instance.interimResults=true;instance.continuous=false;instance.maxAlternatives=1;
+  instance.lang='en-US';instance.interimResults=true;instance.continuous=false;instance.maxAlternatives=1;
   let finalText='',interimText='',ended=false;
   setLiveStatus('Starting microphone…','Waiting for your speech.');
-  startLiveMicMeter();
+  // Do not open a second getUserMedia microphone stream here. SpeechRecognition
+  // owns microphone capture; a parallel stream can prevent some Android browsers
+  // from delivering recognition results. The orb uses its listening animation.
   instance.onstart=()=>{if(recognition!==instance||session!==liveSessionId)return;setLiveStatus('Listening…','Speak naturally, then pause to send your message.');setOrbState('listening');};
   instance.onresult=e=>{
    if(recognition!==instance||session!==liveSessionId)return;
-   let interim='';
-   for(let i=e.resultIndex;i<e.results.length;i++){
-    const result=e.results[i],spoken=result?.[0]?.transcript||'';
-    if(result.isFinal){finalText+=(finalText?' ':'')+spoken.trim();interim='';}
-    else interim+=(interim?' ':'')+spoken.trim();
+   // Re-read the full result list. Some mobile implementations revise interim
+   // results and advance resultIndex in ways that can otherwise drop words.
+   const finals=[],interims=[];
+   for(let i=0;i<e.results.length;i++){
+    const result=e.results[i],spoken=String(result?.[0]?.transcript||'').trim();
+    if(!spoken)continue;
+    if(result.isFinal)finals.push(spoken);else interims.push(spoken);
    }
-   if(interim)interimText=interim;
-   else if(finalText)interimText='';
+   finalText=finals.join(' ').trim();
+   interimText=interims.join(' ').trim();
    const heard=[finalText,interimText].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
    if(heard){els.input.value=heard;autoResize();setLiveStatus('I heard you…','You: '+heard);setOrbState('listening');}
   };
@@ -1346,7 +1350,7 @@ function listenForVoiceTurn(session=liveSessionId){
    if(recognition!==instance||session!==liveSessionId)return;
    const reason=e?.error||'unknown';
    if(reason==='aborted')return; // Expected when the user interrupts or exits Live Mode.
-   if(reason==='no-speech'){setLiveStatus('Listening…','I did not hear speech yet. You can keep speaking.');scheduleLiveListening(350);return;}
+   if(reason==='no-speech'){setLiveStatus('I didn’t catch that','The browser ended this listening attempt without sending any words. Check microphone permission, then speak a little closer to the microphone.');return;}
    if(reason==='not-allowed'||reason==='service-not-allowed'||reason==='audio-capture'){
     liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;clearTimeout(liveRestartTimer);liveRestartTimer=null;
     if(recognition===instance)recognition=null;stopLiveMicMeter();setOrbState('idle');
@@ -1370,11 +1374,10 @@ function listenForVoiceTurn(session=liveSessionId){
     // Mark this as a live turn so its answer is spoken even if a UI preference changes mid-turn.
     Promise.resolve(sendMessage(spoken,{fromLive:true})).catch(error=>{console.error('STELLAR live turn failed:',error);setLiveStatus('Could not send that turn','Please try speaking again.');scheduleLiveListening(700);});
    }else{
-    setLiveStatus('Listening again…','No complete speech was captured. Speak when you are ready.');setOrbState('listening');
-    scheduleLiveListening(450);
+    setLiveStatus('Listening again…','No words reached speech recognition this time. I’ll reopen the microphone; try a short sentence and pause.');setOrbState('listening');
+    scheduleLiveListening(700);
    }
   };
-  startLiveMicMeter();
   instance.start();
  }catch(error){
   if(recognition===instance)recognition=null;
@@ -1767,7 +1770,7 @@ function renderLiveMode(){
   else liveModeActive=true;
   els.voiceBtn.classList.add('active');els.voiceBtn.title='Live Mode is active';
   setLiveStatus('Starting microphone…','Speak naturally, then pause to send your turn.');setOrbState('listening');
-  startLiveMicMeter();scheduleLiveListening(100);
+  scheduleLiveListening(100);
  };
  interruptButton.onclick=()=>{
   setOrbState('interrupted');stopSpeaking();
@@ -1777,7 +1780,7 @@ function renderLiveMode(){
   scheduleLiveListening(450);toast('Speech interrupted.');
  };
  stopButton.onclick=()=>{stopLiveMode();closeModal();};
- if(liveVoiceEnabled&&!recognition&&!isSending&&!isVoicePlaybackBusy()){startLiveMicMeter();scheduleLiveListening(150);}
+ if(liveVoiceEnabled&&!recognition&&!isSending&&!isVoicePlaybackBusy()){scheduleLiveListening(150);}
 }
 function setLiveStatus(label, detail){
  const labelEl=$('#liveStatusLabel');if(labelEl)labelEl.textContent=label;
