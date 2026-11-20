@@ -186,6 +186,54 @@ body{font-size:calc(14px * var(--font-scale,1))}
 .canvas-fs{position:fixed;inset:0;z-index:9999;background:#0b1220;display:flex;flex-direction:column;border-radius:0}
 .canvas-fs iframe,.canvas-preview-wrap:fullscreen iframe{flex:1;height:auto;min-height:0}
 .canvas-preview-wrap:fullscreen{background:#0b1220;display:flex;flex-direction:column}
+
+/* STELLAR Live Mode: full-screen audio-reactive orb */
+.modal.live-mode-modal{width:100vw;height:100dvh;max-height:100dvh;max-width:none;border:0;border-radius:0;padding:clamp(14px,3vw,30px);overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;background:radial-gradient(ellipse at 50% 48%,rgba(20,75,155,.25),transparent 42%),radial-gradient(ellipse at 50% 100%,rgba(49,46,129,.22),transparent 55%),linear-gradient(160deg,#050b1b,#030611 70%,#070b20);box-shadow:none}
+.modal.live-mode-modal .modal-head{flex:0 0 auto;margin-bottom:clamp(8px,2vh,20px)}
+.modal.live-mode-modal .modal-head h2{color:#e7f4ff;letter-spacing:.06em}
+.modal.live-mode-modal .modal-head p{color:#8ba8d2}
+.modal.live-mode-modal .modal-head .brand-mark{background:rgba(34,126,255,.18);color:#7dd3fc;border:1px solid rgba(96,165,250,.25)}
+.live-mode-shell{min-height:0;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:8px;width:100%;max-width:780px;margin:0 auto}
+.live-mode-status{width:min(100%,520px);z-index:2}
+.live-mode-modal .live-status{background:rgba(8,20,43,.68);border-color:rgba(87,157,255,.18);color:#c4d9f7;text-align:center;backdrop-filter:blur(12px);margin:0;padding:11px 14px}
+.live-mode-modal .live-status strong{color:#e7f3ff;font-size:12px;letter-spacing:.04em}
+.live-mode-modal .live-dot.active{background:#60e6ff;box-shadow:0 0 14px rgba(56,189,248,.9)}
+.live-transcript{margin-top:6px;color:#8da9d0;font-size:11px;line-height:1.5;min-height:17px;max-height:42px;overflow:auto;overflow-wrap:anywhere}
+.live-orb-stage{--orb-level:.08;position:relative;isolation:isolate;flex:1;min-height:210px;width:100%;display:grid;place-items:center;overflow:visible;perspective:900px}
+.live-orb-stage::before{content:"";position:absolute;width:min(72vw,390px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(25,125,255,calc(.13 + var(--orb-level)*.22)) 0%,rgba(26,92,213,.09) 35%,transparent 70%);filter:blur(22px);transform:scale(calc(1 + var(--orb-level)*.14));transition:transform .12s linear,opacity .2s}
+.orb-aura{position:absolute;width:min(61vw,300px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(38,142,255,.28),rgba(34,91,220,.12) 42%,transparent 72%);filter:blur(16px);animation:stellar-orb-aura 4.5s ease-in-out infinite}
+.live-orb{position:relative;width:clamp(150px,35vw,224px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;transform:scale(calc(1 + var(--orb-level)*.12));transition:transform .11s linear;filter:drop-shadow(0 0 24px rgba(30,144,255,.44));z-index:2}
+.orb-core{position:absolute;inset:5%;border-radius:50%;background:radial-gradient(circle at 34% 26%,#d8f6ff 0%,#80d9ff 5%,#258bff 20%,#1452c8 43%,#0b1b59 70%,#050b24 100%);box-shadow:inset -18px -22px 38px rgba(0,0,0,.5),inset 10px 9px 24px rgba(208,245,255,.35),0 0 22px rgba(47,153,255,.75),0 0 65px rgba(25,111,255,.45),0 0 120px rgba(37,99,235,.22);animation:stellar-orb-breathe 4s ease-in-out infinite}
+.orb-core::before{content:"";position:absolute;inset:13%;border-radius:50%;border:1px solid rgba(181,231,255,.25);box-shadow:0 0 18px rgba(110,205,255,.3)}
+.orb-highlight{position:absolute;top:14%;left:23%;width:34%;height:18%;border-radius:50%;background:rgba(220,248,255,.45);filter:blur(13px);transform:rotate(-32deg)}
+.orb-glint{position:absolute;top:25%;left:28%;width:8px;height:8px;border-radius:50%;background:#e9fbff;box-shadow:0 0 16px 5px rgba(195,239,255,.9)}
+.orb-ring{position:absolute;width:clamp(195px,45vw,292px);aspect-ratio:1;border:1px solid rgba(83,174,255,.22);border-radius:50%;z-index:1;pointer-events:none}
+.orb-ring-one{transform:rotateX(68deg) rotateZ(-18deg);animation:stellar-ring-spin 14s linear infinite}
+.orb-ring-two{width:clamp(220px,51vw,330px);transform:rotateX(72deg) rotateZ(58deg);border-color:rgba(117,129,255,.22);animation:stellar-ring-spin 19s linear infinite reverse}
+.orb-ring-three{width:clamp(176px,41vw,265px);transform:rotateY(68deg) rotateZ(24deg);border-style:dashed;border-color:rgba(81,211,255,.2);animation:stellar-ring-spin 23s linear infinite}
+.orb-caption{position:absolute;top:calc(50% + clamp(110px,23vw,145px));font-size:9px;letter-spacing:.42em;text-transform:uppercase;color:rgba(163,211,255,.7);text-shadow:0 0 12px rgba(56,189,248,.6)}
+.live-mode-footer{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;padding-bottom:max(2px,env(safe-area-inset-bottom))}
+.live-mode-hint{font-size:11px;color:#90a9ce;text-align:center;min-height:16px}
+.live-controls{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;width:100%}
+.live-controls button{min-height:42px}
+.live-mode-footnote{font-size:9px;line-height:1.5;color:#637b9f;text-align:center;max-width:520px;margin:0}
+.live-orb-stage[data-state="listening"] .orb-core{animation:stellar-orb-listen 2.7s ease-in-out infinite}
+.live-orb-stage[data-state="thinking"] .orb-core{animation:stellar-orb-think 2.1s ease-in-out infinite}
+.live-orb-stage[data-state="thinking"] .orb-ring-one{animation-duration:4s;border-color:rgba(145,130,255,.52)}
+.live-orb-stage[data-state="speaking"] .orb-core{animation:stellar-orb-speak .75s ease-in-out infinite alternate}
+.live-orb-stage[data-state="speaking"] .orb-ring-two{border-color:rgba(55,210,255,.55)}
+.live-orb-stage[data-state="interrupted"] .orb-core{animation:stellar-orb-interrupt .42s ease-out 1}
+.live-orb-stage[data-state="idle"] .orb-core{animation:stellar-orb-breathe 5s ease-in-out infinite;opacity:.78}
+@keyframes stellar-orb-breathe{0%,100%{transform:scale(.97);filter:saturate(.95)}50%{transform:scale(1.025);filter:saturate(1.18)}}
+@keyframes stellar-orb-listen{0%,100%{transform:scale(calc(.98 + var(--orb-level)*.05));filter:brightness(1)}50%{transform:scale(calc(1.025 + var(--orb-level)*.08));filter:brightness(1.2)}}
+@keyframes stellar-orb-think{0%,100%{transform:scale(.97) rotate(0);filter:hue-rotate(0)}50%{transform:scale(1.04) rotate(5deg);filter:hue-rotate(18deg)}}
+@keyframes stellar-orb-speak{from{transform:scale(calc(.99 + var(--orb-level)*.08))}to{transform:scale(calc(1.035 + var(--orb-level)*.16))}}
+@keyframes stellar-orb-interrupt{0%{transform:scale(1)}35%{transform:scale(.9);filter:brightness(1.5)}100%{transform:scale(1);filter:brightness(1)}}
+@keyframes stellar-orb-aura{0%,100%{transform:scale(.9);opacity:.55}50%{transform:scale(1.13);opacity:1}}
+@keyframes stellar-ring-spin{to{rotate:360deg}}
+@media(max-width:540px){.modal.live-mode-modal{padding:12px 12px max(12px,env(safe-area-inset-bottom))}.modal.live-mode-modal .modal-head{margin-bottom:4px}.live-mode-shell{gap:5px}.live-mode-status{width:100%}.live-orb-stage{min-height:200px}.live-orb{width:clamp(145px,43vw,190px)}.orb-caption{top:calc(50% + 108px)}.live-controls{gap:6px}.live-controls button{font-size:10px;padding:9px 10px;min-height:39px}.live-mode-footnote{font-size:8px}}
+@media(prefers-reduced-motion:reduce){.orb-aura,.orb-core,.orb-ring{animation:none!important}.live-orb,.live-orb-stage::before{transition:none!important}}
+
 </style>
 </head>
 <body>
@@ -648,6 +696,9 @@ let activeTtsAudio = null;
 let activeTtsObjectUrl = null;
 let activeTtsCancel = null;
 let voicePlaybackBusy = false;
+let liveMicStream = null, liveMicContext = null, liveMicAnalyser = null, liveMicSource = null, liveMicFrame = null, liveMicMeterStarting = false;
+let ttsMeterContext = null, ttsMeterAnalyser = null, ttsMeterSource = null, ttsMeterFrame = null;
+let liveOrbState = 'idle';
 let lastPrompt = '';
 const MAX_HISTORY = 22;
 
@@ -686,6 +737,7 @@ function openMenu(){els.sidebar.classList.add('open');els.menuOverlay.classList.
 function closeMenu(){els.sidebar.classList.remove('open');els.menuOverlay.classList.remove('open');els.sidebar.setAttribute('aria-hidden','true');}
 function openModal(title, subtitle, body, icon='fa-sparkles'){
   els.modal.classList.toggle('canvas-modal',title==='Canvas');
+  els.modal.classList.toggle('live-mode-modal',title==='Live Mode');
   els.modal.innerHTML=`<div class="modal-head"><div class="brand-mark"><i class="fa-solid ${icon}"></i></div><div><h2 id="modalTitle">${escapeHtml(title)}</h2><p>${escapeHtml(subtitle||'')}</p></div><button class="icon-btn" type="button" data-modal-close aria-label="Close dialog"><i class="fa-solid fa-xmark"></i></button></div>${body}`;
   els.modalBackdrop.classList.add('open'); els.modalBackdrop.setAttribute('aria-hidden','false');
   const closeButton=els.modal.querySelector('[data-modal-close]');
@@ -695,8 +747,9 @@ function openModal(title, subtitle, body, icon='fa-sparkles'){
 function closeModal(){
   // Live Mode is microphone-active only while its dialog is open.
   if(liveModeActive) stopLiveMode();
+  stopLiveMicMeter();stopTtsMeter();
   if(document.fullscreenElement && els.modal.contains(document.fullscreenElement)){try{document.exitFullscreen();}catch{}}
-  els.modalBackdrop.classList.remove('open'); els.modal.classList.remove('canvas-modal'); els.modalBackdrop.setAttribute('aria-hidden','true');
+  els.modalBackdrop.classList.remove('open'); els.modal.classList.remove('canvas-modal','live-mode-modal'); els.modalBackdrop.setAttribute('aria-hidden','true');
 }
 function renderSettings(){
   const voices = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : [];
@@ -950,7 +1003,7 @@ async function processChatRequest(text,path,opts={}){
   if(!assistantMsg){assistantMsg={role:'assistant',text:answer,createdAt:new Date().toISOString(),sources:[],images:[],media:[],model:null,followUps:[]};messages.push(assistantMsg);}
   assistantMsg.text=answer;assistantMsg.sources=bindWorkerSources(data);assistantMsg.images=getImages(data);assistantMsg.media=[];assistantMsg.model=data.model||data.modelName||null;assistantMsg.followUps=suggestFollowups(text,answer,opts.intent?.kind|| (path==='/api/search'?'search':'chat'));
   latestAssistantMessage=answer;persistConversation();renderMessages();
-  if(prefs.voiceReplies||liveVoiceEnabled)speak(answer);
+  if(opts.fromLive||prefs.voiceReplies||liveVoiceEnabled)speak(answer);
   if(path==='/api/search'&&!assistantMsg.sources.length&&!/https?:\/\//i.test(answer))toast('Search returned no structured source links. Check Tavily or the Worker version.');
  }catch(err){
   removeThinking();
@@ -1056,12 +1109,19 @@ async function requestCloudflareTTS(text,runId){
  const controller=new AbortController();activeTtsController=controller;
  const timeout=setTimeout(()=>controller.abort(),25000);
  try{
-  const response=await fetch(STELLAR_CONFIG.apiBase+'/api/tts',{
-   method:'POST',
-   headers:{'Content-Type':'application/json','Accept':'audio/mpeg, application/json'},
-   body:JSON.stringify({text,voice:'luna',format:'mp3'}),
-   signal:controller.signal
-  });
+  let response;
+  try{
+   response=await fetch(STELLAR_CONFIG.apiBase+'/api/tts',{
+    method:'POST',mode:'cors',credentials:'omit',
+    headers:{'Content-Type':'application/json','Accept':'audio/mpeg, application/json'},
+    body:JSON.stringify({text,voice:'luna',format:'mp3'}),
+    signal:controller.signal
+   });
+  }catch(fetchError){
+   if(runId!==speechRunId)throw new DOMException('Speech request was superseded.','AbortError');
+   if(fetchError&&fetchError.name==='AbortError')throw new Error('Cloudflare voice request timed out after 25 seconds.');
+   throw new Error('The browser could not reach the Cloudflare voice endpoint. This is often a Worker CORS/OPTIONS issue: allow the origin https://patrick-chidiebere.github.io and handle OPTIONS on /api/tts. Details: '+(fetchError&&fetchError.message?fetchError.message:'network request failed'));
+  }
   if(runId!==speechRunId)throw new DOMException('Speech request was superseded.','AbortError');
   const contentType=(response.headers.get('content-type')||'').toLowerCase();
   if(!response.ok){
@@ -1083,6 +1143,78 @@ async function requestCloudflareTTS(text,runId){
   if(activeTtsController===controller)activeTtsController=null;
  }
 }
+function setOrbLevel(level){
+ const stage=$('#liveOrbStage');if(!stage)return;
+ const safe=Math.max(0,Math.min(1,Number(level)||0));
+ stage.style.setProperty('--orb-level',safe.toFixed(3));
+}
+function setOrbState(state){
+ const allowed=['idle','listening','thinking','speaking','interrupted'];
+ liveOrbState=allowed.includes(state)?state:'idle';
+ const stage=$('#liveOrbStage');if(stage){stage.dataset.state=liveOrbState;stage.setAttribute('aria-label','STELLAR is '+liveOrbState);}
+ if(liveOrbState==='idle'||liveOrbState==='thinking'||liveOrbState==='interrupted')setOrbLevel(liveOrbState==='thinking'?.18:0);
+}
+async function startLiveMicMeter(){
+ if(!liveModeActive||liveMicStream||liveMicMeterStarting||!navigator.mediaDevices?.getUserMedia)return;
+ const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;
+ liveMicMeterStarting=true;
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  if(!liveModeActive){stream.getTracks().forEach(t=>t.stop());return;}
+  liveMicStream=stream;liveMicContext=new AudioCtx();
+  if(liveMicContext.state==='suspended')await liveMicContext.resume().catch(()=>{});
+  liveMicAnalyser=liveMicContext.createAnalyser();liveMicAnalyser.fftSize=256;liveMicAnalyser.smoothingTimeConstant=.78;
+  liveMicSource=liveMicContext.createMediaStreamSource(stream);liveMicSource.connect(liveMicAnalyser);
+  const data=new Uint8Array(liveMicAnalyser.fftSize);
+  const tick=()=>{
+   if(!liveMicAnalyser||!liveModeActive)return;
+   liveMicAnalyser.getByteTimeDomainData(data);let sum=0;
+   for(let i=0;i<data.length;i++){const v=(data[i]-128)/128;sum+=v*v;}
+   const rms=Math.sqrt(sum/data.length);setOrbLevel(Math.min(1,rms*5.2));
+   liveMicFrame=requestAnimationFrame(tick);
+  };
+  tick();
+ }catch(error){
+  // SpeechRecognition remains available even if a second visual-only meter stream is denied.
+  console.warn('STELLAR microphone orb meter unavailable:',error);
+  setOrbLevel(.10);
+ }finally{liveMicMeterStarting=false;}
+}
+function stopLiveMicMeter(){
+ if(liveMicFrame)cancelAnimationFrame(liveMicFrame);liveMicFrame=null;
+ try{liveMicSource?.disconnect();}catch{}liveMicSource=null;liveMicAnalyser=null;
+ if(liveMicStream){liveMicStream.getTracks().forEach(t=>{try{t.stop();}catch{}});}liveMicStream=null;
+ if(liveMicContext){try{liveMicContext.close();}catch{}}liveMicContext=null;
+ setOrbLevel(0);
+}
+function stopTtsMeter(){
+ if(ttsMeterFrame)cancelAnimationFrame(ttsMeterFrame);ttsMeterFrame=null;
+ try{ttsMeterSource?.disconnect();}catch{}ttsMeterSource=null;ttsMeterAnalyser=null;
+ if(ttsMeterContext){try{ttsMeterContext.close();}catch{}}ttsMeterContext=null;
+}
+function startTtsMeter(audio){
+ stopTtsMeter();
+ const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;
+ try{
+  ttsMeterContext=new AudioCtx();ttsMeterAnalyser=ttsMeterContext.createAnalyser();ttsMeterAnalyser.fftSize=256;ttsMeterAnalyser.smoothingTimeConstant=.82;
+  ttsMeterSource=ttsMeterContext.createMediaElementSource(audio);ttsMeterSource.connect(ttsMeterAnalyser);ttsMeterAnalyser.connect(ttsMeterContext.destination);
+  if(ttsMeterContext.state==='suspended')ttsMeterContext.resume().catch(()=>{});
+  const data=new Uint8Array(ttsMeterAnalyser.frequencyBinCount);
+  const tick=()=>{
+   if(!ttsMeterAnalyser)return;
+   ttsMeterAnalyser.getByteFrequencyData(data);let sum=0;
+   for(let i=0;i<data.length;i++)sum+=data[i]*data[i];
+   const rms=Math.sqrt(sum/data.length)/255;setOrbLevel(Math.min(1,rms*2.4));
+   ttsMeterFrame=requestAnimationFrame(tick);
+  };
+  tick();
+ }catch(error){
+  console.warn('STELLAR playback orb meter unavailable:',error);
+  try{if(ttsMeterSource&&ttsMeterContext)ttsMeterSource.connect(ttsMeterContext.destination);}catch{}
+  if(ttsMeterFrame)cancelAnimationFrame(ttsMeterFrame);ttsMeterFrame=null;ttsMeterAnalyser=null;
+  setOrbLevel(.28);
+ }
+}
 function playTtsBlob(blob,runId,rate){
  return new Promise((resolve,reject)=>{
   if(runId!==speechRunId){resolve();return;}
@@ -1093,6 +1225,7 @@ function playTtsBlob(blob,runId,rate){
   try{audio.preservesPitch=true;}catch{}
   const finish=(error)=>{
    if(settled)return;settled=true;
+   stopTtsMeter();
    if(activeTtsCancel===cancel)activeTtsCancel=null;
    releaseTtsAudio(audio,url);
    if(error)reject(error);else resolve();
@@ -1106,6 +1239,7 @@ function playTtsBlob(blob,runId,rate){
   };
   audio.onended=()=>finish();
   audio.onerror=()=>finish(new Error('The browser could not play the Cloudflare audio response.'));
+  startTtsMeter(audio);
   try{Promise.resolve(audio.play()).catch(error=>finish(error||new Error('Audio playback could not start.')));}
   catch(error){finish(error);}
  });
@@ -1113,7 +1247,8 @@ function playTtsBlob(blob,runId,rate){
 function finishSpeechRun(runId){
  if(runId!==speechRunId)return;
  voicePlaybackBusy=false;showStopSpeak(false);
- if(liveVoiceEnabled&&liveModeActive){setLiveStatus('Ready for your next message','Reply finished. Speak when you are ready.');scheduleLiveListening(350);}
+ if(liveVoiceEnabled&&liveModeActive){setLiveStatus('Ready for your next message','Reply finished. Speak when you are ready.');setOrbState('listening');scheduleLiveListening(350);}
+ else setOrbState('idle');
 }
 function playDeviceSpeech(parts,runId,startIndex=0){
  if(runId!==speechRunId)return;
@@ -1135,7 +1270,7 @@ function playDeviceSpeech(parts,runId,startIndex=0){
   utterance.onstart=()=>{
    if(runId!==speechRunId)return;
    showStopSpeak(true);
-   if(index===startIndex&&liveVoiceEnabled)setLiveStatus('STELLAR is speaking…','Using your device voice because Cloudflare voice could not be played.');
+   if(index===startIndex&&liveVoiceEnabled){setLiveStatus('STELLAR is speaking…','Using your device voice because Cloudflare voice could not be played.');setOrbState('speaking');}
   };
   utterance.onend=()=>{if(runId===speechRunId)next(index+1);};
   utterance.onerror=()=>{
@@ -1151,14 +1286,14 @@ async function playCloudflareSpeech(parts,runId){
  for(let index=0;index<parts.length;index++){
   if(runId!==speechRunId)return;
   try{
-   if(liveVoiceEnabled&&index===0)setLiveStatus('Preparing Cloudflare voice…','Generating the spoken reply.');
+   if(liveVoiceEnabled&&index===0){setLiveStatus('Preparing Cloudflare voice…','Generating the spoken reply.');setOrbState('thinking');}
    const blob=await requestCloudflareTTS(parts[index],runId);
    if(runId!==speechRunId)return;
    await playTtsBlob(blob,runId,rate);
   }catch(error){
    if(runId!==speechRunId)return;
    console.warn('STELLAR Cloudflare TTS unavailable; switching to device speech.',error);
-   toast('Cloudflare voice could not be used. Switching to your device voice for this reply.','error');
+   toast('Cloudflare voice failed: '+(error.message||'unknown error')+'. Switching to your device voice for this reply.','error');
    playDeviceSpeech(parts,runId,index);
    return;
   }
@@ -1176,7 +1311,7 @@ function speak(text){
  const parts=splitSpeechChunks(clean,1800);
  if(!parts.length){finishSpeechRun(thisRun);return;}
  voicePlaybackBusy=true;showStopSpeak(true);
- if(liveVoiceEnabled)setLiveStatus('Preparing voice reply…','Connecting to Cloudflare voice.');
+ if(liveVoiceEnabled){setLiveStatus('Preparing voice reply…','Connecting to Cloudflare voice.');setOrbState('thinking');stopLiveMicMeter();}
  playCloudflareSpeech(parts,thisRun);
 }
 function startVoice(){renderLiveMode();}
@@ -1192,7 +1327,8 @@ function listenForVoiceTurn(session=liveSessionId){
   instance.lang=navigator.language||'en-US';instance.interimResults=true;instance.continuous=false;instance.maxAlternatives=1;
   let finalText='',interimText='',ended=false;
   setLiveStatus('Starting microphone…','Waiting for your speech.');
-  instance.onstart=()=>{if(recognition!==instance||session!==liveSessionId)return;setLiveStatus('Listening…','Speak naturally, then pause to send your message.');};
+  startLiveMicMeter();
+  instance.onstart=()=>{if(recognition!==instance||session!==liveSessionId)return;setLiveStatus('Listening…','Speak naturally, then pause to send your message.');setOrbState('listening');};
   instance.onresult=e=>{
    if(recognition!==instance||session!==liveSessionId)return;
    let interim='';
@@ -1204,14 +1340,16 @@ function listenForVoiceTurn(session=liveSessionId){
    if(interim)interimText=interim;
    else if(finalText)interimText='';
    const heard=[finalText,interimText].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
-   if(heard){els.input.value=heard;autoResize();setLiveStatus('I heard you…','You: '+heard);}
+   if(heard){els.input.value=heard;autoResize();setLiveStatus('I heard you…','You: '+heard);setOrbState('listening');}
   };
   instance.onerror=e=>{
    if(recognition!==instance||session!==liveSessionId)return;
    const reason=e?.error||'unknown';
    if(reason==='aborted')return; // Expected when the user interrupts or exits Live Mode.
+   if(reason==='no-speech'){setLiveStatus('Listening…','I did not hear speech yet. You can keep speaking.');scheduleLiveListening(350);return;}
    if(reason==='not-allowed'||reason==='service-not-allowed'||reason==='audio-capture'){
     liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;clearTimeout(liveRestartTimer);liveRestartTimer=null;
+    if(recognition===instance)recognition=null;stopLiveMicMeter();setOrbState('idle');
     els.voiceBtn.classList.remove('active');
     const message=reason==='audio-capture'?'No microphone was detected.': 'Microphone permission was blocked. Allow microphone access for this HTTPS site.';
     setLiveStatus('Microphone unavailable',message);toast(message,'error');
@@ -1226,15 +1364,17 @@ function listenForVoiceTurn(session=liveSessionId){
    if(!liveVoiceEnabled||!liveModeActive)return;
    const spoken=[finalText,interimText].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
    if(spoken){
+    stopLiveMicMeter();setOrbState('thinking');
     els.input.value='';autoResize();
     setLiveStatus('Sending your message…','You said: '+spoken);
-    // sendMessage routes voice turns through the same chat, search, image and Think paths as typed messages.
-    sendMessage(spoken,{fromLive:true});
+    // Mark this as a live turn so its answer is spoken even if a UI preference changes mid-turn.
+    Promise.resolve(sendMessage(spoken,{fromLive:true})).catch(error=>{console.error('STELLAR live turn failed:',error);setLiveStatus('Could not send that turn','Please try speaking again.');scheduleLiveListening(700);});
    }else{
-    setLiveStatus('Listening again…','No complete speech was captured. Speak when you are ready.');
+    setLiveStatus('Listening again…','No complete speech was captured. Speak when you are ready.');setOrbState('listening');
     scheduleLiveListening(450);
    }
   };
+  startLiveMicMeter();
   instance.start();
  }catch(error){
   if(recognition===instance)recognition=null;
@@ -1611,37 +1751,43 @@ function applyCanvasPreview(files){
  return html;
 }
 function renderLiveMode(){
- openModal('Live Mode','Speak naturally. STELLAR sends your completed turn to the chat backend and reads the reply aloud.','<div id="liveStatus" class="live-status"><span id="liveDot" class="live-dot"></span><strong id="liveStatusLabel">'+(liveVoiceEnabled?'Live Mode is active':'Not listening')+'</strong><div id="liveTranscript" style="margin-top:8px;color:var(--muted)">'+(liveVoiceEnabled?'Live Mode is active. Continue speaking after each reply.':'Tap Start listening, speak naturally, and pause when you finish.')+'</div></div><div class="canvas-controls"><button type="button" class="primary-button" id="liveStart"><i class="fa-solid fa-microphone"></i> '+(liveVoiceEnabled?'Resume listening':'Start listening')+'</button><button type="button" class="secondary-button" id="liveInterrupt"><i class="fa-solid fa-hand"></i> Interrupt / stop speaking</button><button type="button" class="secondary-button" id="liveStop"><i class="fa-solid fa-stop"></i> End Live Mode</button></div><p style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:12px">Live Mode uses your browser for microphone recognition and Cloudflare’s Luna voice for spoken replies. If Cloudflare audio is unavailable, STELLAR falls back to your selected device voice. Keep this dialog open while using the microphone. Closing it ends Live Mode. Microphone access requires a secure HTTPS page and browser permission.</p>','fa-microphone-lines');
+ openModal('Live Mode','A live voice conversation with STELLAR.','<div class="live-mode-shell">'+
+  '<div class="live-mode-status"><div class="live-status"><span id="liveDot" class="live-dot"></span><strong id="liveStatusLabel">'+(liveVoiceEnabled?'Listening…':'Ready to connect')+'</strong><div id="liveTranscript" class="live-transcript">'+(liveVoiceEnabled?'Speak naturally. Pause when you finish your turn.':'Start listening to begin your conversation.')+'</div></div></div>'+
+  '<div class="live-orb-stage" id="liveOrbStage" data-state="'+(liveVoiceEnabled?'listening':'idle')+'" role="img" aria-label="STELLAR is '+(liveVoiceEnabled?'listening':'idle')+'"><div class="orb-aura"></div><div class="orb-ring orb-ring-one"></div><div class="orb-ring orb-ring-two"></div><div class="orb-ring orb-ring-three"></div><div class="live-orb"><div class="orb-core"></div><div class="orb-highlight"></div><div class="orb-glint"></div></div><div class="orb-caption">STELLAR</div></div>'+
+  '<div class="live-mode-footer"><div class="live-mode-hint">'+(liveVoiceEnabled?'I’m listening. Speak when you’re ready.':'Your voice conversation stays connected while this screen is open.')+'</div><div class="live-controls"><button type="button" class="primary-button" id="liveStart"><i class="fa-solid fa-microphone"></i> '+(liveVoiceEnabled?'Resume listening':'Start listening')+'</button><button type="button" class="secondary-button" id="liveInterrupt"><i class="fa-solid fa-hand"></i> Interrupt</button><button type="button" class="secondary-button" id="liveStop"><i class="fa-solid fa-phone-slash"></i> End conversation</button></div><p class="live-mode-footnote">Microphone recognition uses your browser. Spoken replies use Cloudflare’s Luna voice. Keep this screen open during the conversation.</p></div></div>','fa-microphone-lines');
  const startButton=$('#liveStart');
  const interruptButton=$('#liveInterrupt');
  const stopButton=$('#liveStop');
- if(liveVoiceEnabled){$('#liveDot')?.classList.add('active');}
+ if(liveVoiceEnabled){$('#liveDot')?.classList.add('active');setOrbState('listening');}
  startButton.onclick=()=>{
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!window.isSecureContext){toast('Live Mode requires the hosted HTTPS version of STELLAR AI.','error');return;}
   if(!SR){toast('This browser does not support speech recognition. Try a compatible browser and allow microphone access.','error');return;}
   if(!liveVoiceEnabled){liveVoiceEnabled=true;liveModeActive=true;liveSessionId++;}
   else liveModeActive=true;
-  els.voiceBtn.classList.add('active');
-  els.voiceBtn.title='Live Mode is active';
-  setLiveStatus('Starting microphone…','Speak naturally, then pause to send your turn.');
-  scheduleLiveListening(100);
+  els.voiceBtn.classList.add('active');els.voiceBtn.title='Live Mode is active';
+  setLiveStatus('Starting microphone…','Speak naturally, then pause to send your turn.');setOrbState('listening');
+  startLiveMicMeter();scheduleLiveListening(100);
  };
  interruptButton.onclick=()=>{
-  stopSpeaking();
+  setOrbState('interrupted');stopSpeaking();
   if(recognition)retireLiveRecognition(true);
   if(isSending&&requestController){requestController.abort();setLiveStatus('Interrupting response…','The current response is being stopped.');}
   else setLiveStatus('Listening will resume','Speak when you are ready.');
-  scheduleLiveListening(450);
-  toast('Speech interrupted.');
+  scheduleLiveListening(450);toast('Speech interrupted.');
  };
  stopButton.onclick=()=>{stopLiveMode();closeModal();};
- if(liveVoiceEnabled&&!recognition&&!isSending&&!isVoicePlaybackBusy())scheduleLiveListening(150);
+ if(liveVoiceEnabled&&!recognition&&!isSending&&!isVoicePlaybackBusy()){startLiveMicMeter();scheduleLiveListening(150);}
 }
 function setLiveStatus(label, detail){
  const labelEl=$('#liveStatusLabel');if(labelEl)labelEl.textContent=label;
  const detailEl=$('#liveTranscript');if(detailEl&&detail!==undefined)detailEl.textContent=detail;
  const dot=$('#liveDot');if(dot)dot.classList.toggle('active',!!liveVoiceEnabled);
+ const l=String(label||'').toLowerCase();
+ if(/speaking|playing/.test(l))setOrbState('speaking');
+ else if(/thinking|preparing|sending|waiting|interrupting/.test(l))setOrbState(l.includes('interrupt')?'interrupted':'thinking');
+ else if(/listening|heard you|ready for your next/.test(l))setOrbState('listening');
+ else if(/ended|unavailable|could not|error|secure connection/.test(l))setOrbState('idle');
 }
 function retireLiveRecognition(abort=true){
  const current=recognition;recognition=null;
@@ -1663,6 +1809,7 @@ function scheduleLiveListening(delay=550){
 }
 function stopLiveMode(){
  liveVoiceEnabled=false;liveModeActive=false;liveSessionId++;
+ stopLiveMicMeter();stopTtsMeter();setOrbState('idle');
  clearTimeout(liveRestartTimer);liveRestartTimer=null;
  retireLiveRecognition(true);
  stopSpeaking();
@@ -1747,7 +1894,7 @@ function speakable(t){
  return s.slice(0,6000);
 }
 function showStopSpeak(on){const b=$('#stopSpeakBtn');if(b)b.classList.toggle('hidden',!on);}
-function stopSpeaking(){speechRunId++;cancelCloudflareVoice();try{if('speechSynthesis'in window)speechSynthesis.cancel();}catch{}showStopSpeak(false);scheduleLiveListening(300);}
+function stopSpeaking(){speechRunId++;cancelCloudflareVoice();stopTtsMeter();try{if('speechSynthesis'in window)speechSynthesis.cancel();}catch{}showStopSpeak(false);if(liveVoiceEnabled&&liveModeActive){setOrbState('interrupted');scheduleLiveListening(300);}else setOrbState('idle');}
 $('#stopSpeakBtn').addEventListener('click',stopSpeaking);
 setInterval(()=>{if(!voicePlaybackBusy&&(!('speechSynthesis'in window)||(!speechSynthesis.speaking&&!speechSynthesis.pending)))showStopSpeak(false);},600);
 
